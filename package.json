@@ -1,0 +1,42 @@
+{
+  "name": "market-dashboard",
+  "version": "2.0.0",
+  "description": "Enterprise market dashboard with EOD database, live screener, and historical data",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run server:dev\" \"npm run client:dev\"",
+    "server:dev": "node --watch server/index.js",
+    "server:start": "YF_DISABLE_VERSION_CHECK=1 node server/index.js",
+    "client:dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "db:init": "node -e \"import('./server/db/index.js').then(m=>m.runMigrations())\"",
+    "bootstrap": "node server/jobs/bootstrap.js",
+    "bootstrap:1y": "YF_DISABLE_VERSION_CHECK=1 node server/jobs/bootstrap.js --years 1",
+    "bootstrap:2y": "YF_DISABLE_VERSION_CHECK=1 node server/jobs/bootstrap.js --years 2",
+    "bootstrap:retry": "YF_DISABLE_VERSION_CHECK=1 node server/jobs/bootstrap.js --retry",
+    "bootstrap:reset": "YF_DISABLE_VERSION_CHECK=1 node server/jobs/bootstrap.js --reset --years 2",
+    "enrich:sectors": "YF_DISABLE_VERSION_CHECK=1 node server/jobs/enrich-sectors.js",
+    "compute:analytics": "YF_DISABLE_VERSION_CHECK=1 node server/jobs/compute-analytics.js",
+    "compute:earnings": "YF_DISABLE_VERSION_CHECK=1 node server/jobs/compute-analytics.js --earnings",
+    "eod:collect": "YF_DISABLE_VERSION_CHECK=1 node server/jobs/eod-manual.js",
+    "compute:ema": "YF_DISABLE_VERSION_CHECK=1 node server/jobs/compute-ema-touch.js",
+    "bootstrap:fix-empty": "YF_DISABLE_VERSION_CHECK=1 node server/jobs/bootstrap.js --retry",
+    "bootstrap:status": "node -e \"import('./server/db/index.js').then(m=>{ const rows=m.db.prepare('SELECT status,COUNT(*) n FROM bootstrap_status GROUP BY status').all(); rows.forEach(r=>console.log(r.status+': '+r.n)); process.exit(0); })\""
+  },
+  "dependencies": {
+    "express": "^4.18.3",
+    "cors": "^2.8.5",
+    "yahoo-finance2": "^3.14.0",
+    "better-sqlite3": "^9.4.3",
+    "node-cron": "^3.0.3",
+    "dotenv": "^16.4.5",
+    "compression": "^1.7.4",
+    "helmet": "^7.1.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "vite": "^5.1.4"
+  }
+}
