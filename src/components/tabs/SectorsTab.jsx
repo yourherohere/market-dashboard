@@ -15,12 +15,12 @@ async function apiFetch(path, opts={}) {
 
 // ── Shared constants ─────────────────────────────────────────────────────────
 const heat = v => {
-  if(v>=5)  return{bg:"rgba(0,232,122,.25)",fg:T.accent};
-  if(v>=2)  return{bg:"rgba(0,232,122,.12)",fg:T.accent};
-  if(v>=0)  return{bg:"rgba(0,232,122,.05)",fg:"#7ab89a"};
-  if(v>=-2) return{bg:"rgba(255,69,96,.05)", fg:"#d08080"};
-  if(v>=-5) return{bg:"rgba(255,69,96,.12)", fg:"#ff6060"};
-  return      {bg:"rgba(255,69,96,.25)",fg:T.down};
+  if(v>=5)  return{bg:"rgba(0,232,122,.25)", fg:"var(--clr-up)"};
+  if(v>=2)  return{bg:"rgba(0,232,122,.12)", fg:"var(--clr-up-soft)"};
+  if(v>=0)  return{bg:"rgba(0,232,122,.05)", fg:"#7ab89a"};
+  if(v>=-2) return{bg:"rgba(255,69,96,.05)",  fg:"#d08080"};
+  if(v>=-5) return{bg:"rgba(255,69,96,.12)",  fg:"#ff6060"};
+  return      {bg:"rgba(255,69,96,.25)",      fg:"var(--clr-dn)"};
 };
 
 function calcEMASeries(candles, period) {
