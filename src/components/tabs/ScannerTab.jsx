@@ -293,12 +293,13 @@ const SECTOR_INDUSTRY_MAP = {
 const ALL_SECTORS = Object.keys(SECTOR_INDUSTRY_MAP);
 
 // ─── MULTI-SELECT DROPDOWN ────────────────────────────────────────────────────
-function MultiSelectDropdown({ label, options, selected, onChange, color, width=200 }) {
+function MultiSelectDropdown({ label, options, selected, onChange, propColor, width=200 }) {
   const _tk = useTheme();
   const T   = THEME[_tk] || THEME.night;
-  const _color = color || T.accent;
+  const _color = propColor || T.accent;
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  // ... rest of the function body identical to original, but using _color variable
   useEffect(() => {
     const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener("mousedown", h);
