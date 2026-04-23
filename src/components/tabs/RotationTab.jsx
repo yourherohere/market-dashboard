@@ -337,7 +337,7 @@ function MultiSelectDropdown({ label, options, selected, onChange, propColor, wi
   );
 }
 
-// ─── MAIN ROTATION TAB (rest of the component with fixed keys) ─────────────────────
+// ─── MAIN ROTATION TAB – ORIGINAL WORKING VERSION (only heat & MultiSelectDropdown fixes) ───
 export default function RotationTab({ etfQuotes = {} }) {
   const themeKey = useTheme();
   const T = THEME[themeKey] || THEME.night;
@@ -507,8 +507,8 @@ export default function RotationTab({ etfQuotes = {} }) {
   return(
     <div>
       <div style={{display:"flex",gap:0,marginBottom:14,background:cardBg,border:`1px solid ${T.border}`,borderRadius:6,overflow:"hidden"}}>
-        {VIEW_BTNS.map(([k,l], idx) => (
-          <button key={`view-btn-${k}-${idx}`} onClick={()=>setView(k)}
+        {VIEW_BTNS.map(([k,l])=>(
+          <button key={k} onClick={()=>setView(k)}
             style={{flex:1,fontFamily:"monospace",fontSize:9,padding:"8px 0",border:"none",
               borderRight:k!=="heatmap"?`1px solid ${T.border}`:"none",cursor:"pointer",
               background:view===k?"rgba(0,232,122,.12)":cardBg,
@@ -537,7 +537,7 @@ export default function RotationTab({ etfQuotes = {} }) {
               gridTemplateColumns:"170px 80px 70px 60px 60px 70px 80px 80px 90px 120px",
               padding:"8px 16px",background:rowBg,borderBottom:`2px solid ${T.border2}`,gap:4,alignItems:"center"}}>
               {["SECTOR / ETF","1D CHG","1W","1M","3M","YTD","A/D%","REL VOL","SCORE","STATUS"].map((h,i)=>(
-                <span key={`header-${h}-${i}`} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,
+                <span key={h} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,
                   letterSpacing:".08em",textAlign:i>=2?"center":"left"}}>{h}</span>
               ))}
             </div>
@@ -547,7 +547,7 @@ export default function RotationTab({ etfQuotes = {} }) {
               const isSelected=selSec===s.sector;
               const etfD1 = s.etf?.d1;
               return(
-                <div key={`sector-${s.sector}-${i}`}>
+                <div key={s.sector}>
                   <div
                     onClick={()=>setSelSec(isSelected?null:s.sector)}
                     style={{display:"grid",
@@ -576,7 +576,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                     {[null,null,null,null].map((_,j)=>{
                       const keys=["d5","d1m","d3m","dYTD"];
                       const v=s.etf?s.etf[keys[j]]:null;
-                      return<div key={`etf-perf-${s.sector}-${j}`} style={{textAlign:"center"}}><PCell v={v}/></div>;
+                      return<div key={j} style={{textAlign:"center"}}><PCell v={v}/></div>;
                     })}
                     <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"center"}}>
                       <div style={{width:"100%",height:4,background:T.border,borderRadius:2,overflow:"hidden"}}>
@@ -607,7 +607,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                   </div>
 
                   {s.etf&&(
-                    <div key={`etf-row-${s.etfSym}-${i}`} style={{display:"grid",
+                    <div style={{display:"grid",
                       gridTemplateColumns:"170px 80px 80px 70px 60px 60px 70px 80px 80px 90px 120px",
                       padding:"5px 16px 5px 20px",gap:4,alignItems:"center",
                       borderBottom:`1px solid ${T.border}`,
@@ -623,7 +623,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                         <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint}}>ETF BENCH</span>
                       </div>
                       {["d1","d5","d1m","d3m","dYTD"].map(k=>(
-                        <div key={`etf-bench-${s.etfSym}-${k}`} style={{textAlign:"center"}}><PCell v={s.etf[k]}/></div>
+                        <div key={k} style={{textAlign:"center"}}><PCell v={s.etf[k]}/></div>
                       ))}
                       <div style={{textAlign:"center"}}>
                         <span style={{fontFamily:"monospace",fontSize:8,color:T.textFaint}}>
@@ -641,7 +641,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                   )}
 
                   {isSelected&&sel&&(
-                    <div key={`expanded-${s.sector}`} style={{borderBottom:`1px solid ${s.color}22`,background:dark?T.inputBg:T.surface2}}>
+                    <div style={{borderBottom:`1px solid ${s.color}22`,background:dark?T.inputBg:T.surface2}}>
                       <div style={{padding:"12px 16px",background:`${s.color}0e`,
                         borderBottom:`1px solid ${s.color}22`,display:"flex",flexWrap:"wrap",gap:12,alignItems:"flex-start"}}>
                         <div style={{flex:1}}>
@@ -660,8 +660,8 @@ export default function RotationTab({ etfQuotes = {} }) {
                         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                           {[["▲ TOP GAINER",sel.topG,T.accent],
                             ["▼ TOP LOSER", sel.topL,T.down],
-                            ["◉ HIGHEST VOL",sel.topV,"#ff9f1c"]].map(([lbl,t,col], idx)=>t&&(
-                            <div key={`spotlight-${s.sector}-${idx}`} style={{background:cardBg,border:`1px solid ${col}22`,borderRadius:5,padding:"7px 12px",minWidth:100}}>
+                            ["◉ HIGHEST VOL",sel.topV,"#ff9f1c"]].map(([lbl,t,col])=>t&&(
+                            <div key={lbl} style={{background:cardBg,border:`1px solid ${col}22`,borderRadius:5,padding:"7px 12px",minWidth:100}}>
                               <div style={{fontFamily:"monospace",fontSize:7,color:T.textFaint,letterSpacing:".06em",marginBottom:3}}>{lbl}</div>
                               <div style={{fontFamily:"monospace",fontSize:13,color:T.text,fontWeight:700}}>{t.symbol}</div>
                               <div style={{fontFamily:"monospace",fontSize:11,color:col,fontWeight:700}}>{pct(t.change)}</div>
@@ -677,7 +677,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                             SUB-SECTOR ETFs
                           </div>
                           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:6}}>
-                            <div key={`primary-etf-${s.sector}`} style={{background:cardBg,border:`1px solid ${s.color}44`,borderRadius:4,padding:"8px 10px"}}>
+                            <div style={{background:cardBg,border:`1px solid ${s.color}44`,borderRadius:4,padding:"8px 10px"}}>
                               <div style={{fontFamily:"monospace",fontSize:8,color:s.color,letterSpacing:".06em",marginBottom:4}}>PRIMARY — {sel.etfSym}</div>
                               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                                 <div>
@@ -689,11 +689,11 @@ export default function RotationTab({ etfQuotes = {} }) {
                                 <PCell v={sel.etf?.d1} big/>
                               </div>
                             </div>
-                            {sel.subEtfData.map((se, idx)=>{
+                            {sel.subEtfData.map(se=>{
                               const d=se.data;
                               const c=d?(d.d1>0?T.accent:d.d1<0?T.down:T.textMid):T.textMid;
                               return(
-                                <div key={`sub-etf-${se.sym}-${idx}`} style={{background:cardBg,border:`1px solid ${T.border}`,borderRadius:4,padding:"8px 10px",
+                                <div key={se.sym} style={{background:cardBg,border:`1px solid ${T.border}`,borderRadius:4,padding:"8px 10px",
                                   opacity:d?1:0.5}}>
                                   <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,letterSpacing:".04em",marginBottom:4}}>
                                     {se.focus}
@@ -714,7 +714,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                                   </div>
                                   {d&&<div style={{display:"flex",gap:4,marginTop:6,flexWrap:"wrap"}}>
                                     {["d5","d1m","d3m"].map(k=>(
-                                      <span key={`sub-perf-${se.sym}-${k}`} style={{fontFamily:"monospace",fontSize:7.5,
+                                      <span key={k} style={{fontFamily:"monospace",fontSize:7.5,
                                         color:d[k]>0?T.accent:d[k]<0?T.down:T.textMid}}>
                                         {k==="d5"?"1W":k==="d1m"?"1M":"3M"} {d[k]!=null?(d[k]>=0?"+":"")+d[k].toFixed(1)+"%":"—"}
                                       </span>
@@ -735,11 +735,11 @@ export default function RotationTab({ etfQuotes = {} }) {
                           <div style={{display:"grid",gridTemplateColumns:"1fr 70px 60px 50px 50px",
                             padding:"4px 10px",background:rowBg,borderRadius:4,marginBottom:4}}>
                             {["INDUSTRY","1D AVG","REL VOL","ADV","DEC"].map(h=>(
-                              <span key={`ind-header-${h}`} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,letterSpacing:".06em"}}>{h}</span>
+                              <span key={h} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,letterSpacing:".06em"}}>{h}</span>
                             ))}
                           </div>
                           {sel.sectorInds.map((ind,idx)=>(
-                            <div key={`industry-${ind.industry}-${idx}`}
+                            <div key={ind.industry}
                               style={{display:"grid",gridTemplateColumns:"1fr 70px 60px 50px 50px",
                                 padding:"6px 10px",borderBottom:idx<sel.sectorInds.length-1?`1px solid ${T.border}`:"none",
                                 alignItems:"center",transition:"background .1s"}}
@@ -769,12 +769,12 @@ export default function RotationTab({ etfQuotes = {} }) {
                         {[["▲ GAINERS",sel.gainers.sort((a,b)=>b.change-a.change).slice(0,6),T.accent],
                           ["▼ LOSERS", sel.losers.sort((a,b)=>a.change-b.change).slice(0,6),T.down],
                           ["◉ VOL",    [...sel.all].sort((a,b)=>(b.relVol||0)-(a.relVol||0)).slice(0,6),"#ff9f1c"],
-                        ].map(([lbl,list,col], colIdx)=>(
-                          <div key={`${lbl}-${colIdx}`} style={{borderRight:`1px solid ${T.border}`}}>
+                        ].map(([lbl,list,col])=>(
+                          <div key={lbl} style={{borderRight:`1px solid ${T.border}`}}>
                             <div style={{fontFamily:"monospace",fontSize:8,color:col,padding:"6px 12px",
                               borderBottom:`1px solid ${col}22`,background:`${col}08`,letterSpacing:".08em"}}>{lbl}</div>
-                            {list.map((t, tickerIdx)=>(
-                              <div key={`${lbl}-${t.symbol}-${tickerIdx}`} style={{display:"flex",justifyContent:"space-between",
+                            {list.map(t=>(
+                              <div key={t.symbol} style={{display:"flex",justifyContent:"space-between",
                                 padding:"5px 12px",borderBottom:`1px solid ${T.border}`,transition:"background .1s"}}
                                 onMouseEnter={e=>e.currentTarget.style.background=`${col}06`}
                                 onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
@@ -799,14 +799,14 @@ export default function RotationTab({ etfQuotes = {} }) {
           </div>
 
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
-            {[["LEADING",T.accent,leading],["NEUTRAL","#ffe040",neutral],["LAGGING",T.down,lagging]].map(([lbl,col,list], idx)=>(
-              <div key={`status-col-${lbl}-${idx}`} style={{background:cardBg,border:`1px solid ${col}22`,borderRadius:6,overflow:"hidden"}}>
+            {[["LEADING",T.accent,leading],["NEUTRAL","#ffe040",neutral],["LAGGING",T.down,lagging]].map(([lbl,col,list])=>(
+              <div key={lbl} style={{background:cardBg,border:`1px solid ${col}22`,borderRadius:6,overflow:"hidden"}}>
                 <div style={{fontFamily:"monospace",fontSize:9,color:col,padding:"7px 12px",
                   borderBottom:`1px solid ${col}22`,background:`${col}09`,letterSpacing:".08em",fontWeight:700}}>
                   {lbl} <span style={{color:`${col}55`,fontWeight:400}}>({list.length})</span>
                 </div>
-                {list.map((s, sidx)=>(
-                  <div key={`${lbl}-${s.sector}-${sidx}`}
+                {list.map(s=>(
+                  <div key={s.sector}
                     onClick={()=>setSelSec(selSec===s.sector?null:s.sector)}
                     style={{padding:"8px 12px",borderBottom:`1px solid ${T.border}`,cursor:"pointer",
                       transition:"background .1s",background:selSec===s.sector?`${col}0e`:"transparent"}}
@@ -847,7 +847,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                   const ap=s.adPct;
                   const c=ap>=70?T.accent:ap>=50?"#ffe040":T.down;
                   return(
-                    <div key={`ad-${s.sector}-${i}`} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 14px",
+                    <div key={s.sector} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 14px",
                       borderBottom:i<sectors.length-1?`1px solid ${T.border}`:"none"}}>
                       <div style={{width:6,height:6,borderRadius:"50%",background:s.color,flexShrink:0}}/>
                       <span style={{fontFamily:"monospace",fontSize:9.5,color:T.text,minWidth:120}}>{s.sector}</span>
@@ -866,7 +866,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                 {[...sectors].sort((a,b)=>b.avgRV-a.avgRV).map((s,i)=>{
                   const maxRV=Math.max(...sectors.map(x=>x.avgRV),1);
                   return(
-                    <div key={`rv-${s.sector}-${i}`} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 14px",
+                    <div key={s.sector} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 14px",
                       borderBottom:i<sectors.length-1?`1px solid ${T.border}`:"none"}}>
                       <div style={{width:6,height:6,borderRadius:"50%",background:s.color,flexShrink:0}}/>
                       <span style={{fontFamily:"monospace",fontSize:9.5,color:T.text,minWidth:120}}>{s.sector}</span>
@@ -896,8 +896,8 @@ export default function RotationTab({ etfQuotes = {} }) {
             <div style={{display:"flex",gap:6,alignItems:"center"}}>
               <span>11 SECTOR ETFs (SPDR)</span>
               <span style={{color:T.textFaint,fontSize:7,marginLeft:4}}>SORT:</span>
-              {[["d1","1D"],["d5","1W"],["d1m","1M"],["d3m","3M"],["dYTD","YTD"]].map(([k,l], idx)=>(
-                <button key={`sort-${k}-${idx}`} onClick={()=>{setEtfSort(k);setEtfSortDir(d=>etfSort===k?-d:-1);}}
+              {[["d1","1D"],["d5","1W"],["d1m","1M"],["d3m","3M"],["dYTD","YTD"]].map(([k,l])=>(
+                <button key={k} onClick={()=>{setEtfSort(k);setEtfSortDir(d=>etfSort===k?-d:-1);}}
                   style={{fontFamily:"monospace",fontSize:8,padding:"2px 6px",border:"none",
                     borderRadius:3,cursor:"pointer",
                     background:etfSort===k?"rgba(0,232,122,.2)":rowBg,
@@ -909,16 +909,17 @@ export default function RotationTab({ etfQuotes = {} }) {
           </div>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(160px,1fr))",gap:8,marginBottom:16}}>
             {Object.entries(GICS)
-              .map(([nm,cfg], idx)=>({nm,cfg,etf:etfQuotes[cfg.etf], idx}))
+              .map(([nm,cfg])=>({nm,cfg,etf:etfQuotes[cfg.etf]}))
               .sort((a,b)=>{
                 const av=a.etf?(a.etf[etfSort]??-999):-999;
                 const bv=b.etf?(b.etf[etfSort]??-999):-999;
                 return etfSortDir*(bv-av);
               })
-              .map(({nm,cfg,etf, idx})=>{
+              .map(({nm,cfg})=>{
+              const etf=etfQuotes[cfg.etf];
               const c=etf?(etf.d1>0?T.accent:etf.d1<0?T.down:T.textMid):T.textGhost;
               return(
-                <div key={`etf-card-${cfg.etf}-${idx}`} style={{background:cardBg,border:`1px solid ${etf?cfg.color+"33":T.border}`,
+                <div key={nm} style={{background:cardBg,border:`1px solid ${etf?cfg.color+"33":T.border}`,
                   borderTop:`3px solid ${cfg.color}`,borderRadius:6,padding:"10px 12px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
                     <div>
@@ -936,14 +937,15 @@ export default function RotationTab({ etfQuotes = {} }) {
                   </div>
                   {etf&&(
                     <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:3}}>
-                      {[["1W",etf.d5],["1M",etf.d1m],["3M",etf.d3m],["YTD",etf.dYTD]].map(([l,v], subIdx)=>(
-                        <div key={`etf-metric-${cfg.etf}-${l}-${subIdx}`} style={{background:rowBg,borderRadius:3,padding:"2px 5px",display:"flex",justifyContent:"space-between"}}>
+                      {[["1W",etf.d5],["1M",etf.d1m],["3M",etf.d3m],["YTD",etf.dYTD]].map(([l,v])=>{
+                        const vc=v==null?T.textGhost:v>0?T.accent:T.down;
+                        return<div key={l} style={{background:rowBg,borderRadius:3,padding:"2px 5px",display:"flex",justifyContent:"space-between"}}>
                           <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint}}>{l}</span>
-                          <span style={{fontFamily:"monospace",fontSize:7.5,color:v==null?T.textGhost:v>0?T.accent:T.down,fontWeight:700}}>
+                          <span style={{fontFamily:"monospace",fontSize:7.5,color:vc,fontWeight:700}}>
                             {v==null?"—":(v>=0?"+":"")+v.toFixed(1)+"%"}
                           </span>
-                        </div>
-                      ))}
+                        </div>;
+                      })}
                     </div>
                   )}
                   <div style={{marginTop:6}}>
@@ -974,17 +976,17 @@ export default function RotationTab({ etfQuotes = {} }) {
             <div style={{display:"grid",gridTemplateColumns:"80px 1fr 120px 80px 70px 70px 70px 70px 70px 60px 60px",
               padding:"7px 14px",background:rowBg,borderBottom:`1px solid ${T.border2}`,gap:4}}>
               {["ETF","NAME","FOCUS / SECTOR","PRICE","1D","1W","1M","3M","YTD","50D","200D"].map((h,i)=>(
-                <span key={`sub-header-${h}-${i}`} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,
+                <span key={h} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,
                   letterSpacing:".06em",textAlign:i>=3?"center":"left"}}>{h}</span>
               ))}
             </div>
-            {Object.entries(GICS).flatMap(([sectorNm,cfg], secIdx)=>
-              cfg.subEtfs.map(se=>({...se,sectorNm,sectorColor:cfg.color, secIdx}))
+            {Object.entries(GICS).flatMap(([sectorNm,cfg])=>
+              cfg.subEtfs.map(se=>({...se,sectorNm,sectorColor:cfg.color}))
             ).map((se,i,arr)=>{
               const d=etfQuotes[se.sym];
               const c=d?(d.d1>0?T.accent:d.d1<0?T.down:T.textMid):T.textMid;
               return(
-                <div key={`sub-etf-row-${se.sym}-${i}`} style={{display:"grid",
+                <div key={se.sym} style={{display:"grid",
                   gridTemplateColumns:"80px 1fr 120px 80px 70px 70px 70px 70px 70px 60px 60px",
                   padding:"7px 14px",gap:4,alignItems:"center",
                   borderBottom:i<arr.length-1?`1px solid ${T.border}`:"none",
@@ -1002,7 +1004,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                   {d?<>
                     <div style={{textAlign:"center",fontFamily:"monospace",fontSize:10,color:T.text}}>${d.price.toFixed(2)}</div>
                     {["d1","d5","d1m","d3m","dYTD"].map(k=>(
-                      <div key={`sub-${se.sym}-${k}`} style={{textAlign:"center"}}>
+                      <div key={k} style={{textAlign:"center"}}>
                         {d[k]!=null
                           ?<span style={{fontFamily:"monospace",fontSize:10,fontWeight:700,
                               color:d[k]>0?T.accent:d[k]<0?T.down:T.textMid}}>
@@ -1013,7 +1015,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                     ))}
                     {[d.a50,d.a200].map((v,j)=>{
                       const ab=v===true,no=v===false;
-                      return<div key={`sub-${se.sym}-ema-${j}`} style={{textAlign:"center"}}>
+                      return<div key={j} style={{textAlign:"center"}}>
                         <span style={{fontFamily:"monospace",fontSize:8,fontWeight:700,
                           color:ab?T.accent:no?T.down:T.textGhost,
                           background:ab?"rgba(0,232,122,.1)":no?"rgba(255,69,96,.1)":"transparent",
@@ -1024,7 +1026,7 @@ export default function RotationTab({ etfQuotes = {} }) {
                     })}
                   </>:<>
                     <div style={{textAlign:"center",fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</div>
-                    {[0,1,2,3,4,5,6].map(k=><div key={`sub-${se.sym}-empty-${k}`} style={{textAlign:"center",fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</div>)}
+                    {[0,1,2,3,4,5,6].map(k=><div key={k} style={{textAlign:"center",fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</div>)}
                   </>}
                 </div>
               );
@@ -1043,7 +1045,7 @@ export default function RotationTab({ etfQuotes = {} }) {
             <div style={{display:"grid",gridTemplateColumns:"1fr 72px 64px 100px",padding:"5px 14px",
               background:rowBg,borderBottom:`1px solid ${T.border}`}}>
               {["INDUSTRY / SECTOR","AVG CHG","REL VOL","SECTOR ETF"].map(h=>(
-                <span key={`ind-head-leading-${h}`} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,letterSpacing:".06em"}}>{h}</span>
+                <span key={h} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,letterSpacing:".06em"}}>{h}</span>
               ))}
             </div>
             {allInds.filter(i=>i.avgChg>0).sort((a,b)=>b.avgChg-a.avgChg).slice(0,20).map((ind,i,arr)=>{
@@ -1051,7 +1053,7 @@ export default function RotationTab({ etfQuotes = {} }) {
               const sectorGics=Object.entries(GICS).find(([nm])=>nm===ind.sector)?.[1];
               const etfD=sectorGics?etfQuotes[sectorGics.etf]:null;
               return(
-                <div key={`leading-industry-${ind.industry}-${i}`} style={{display:"grid",gridTemplateColumns:"1fr 72px 64px 100px",
+                <div key={ind.industry+i} style={{display:"grid",gridTemplateColumns:"1fr 72px 64px 100px",
                   padding:"7px 14px",borderBottom:i<arr.length-1?`1px solid ${T.border}`:"none",
                   alignItems:"center",transition:"background .1s"}}
                   onMouseEnter={e=>e.currentTarget.style.background="rgba(0,232,122,.04)"}
@@ -1095,7 +1097,7 @@ export default function RotationTab({ etfQuotes = {} }) {
             <div style={{display:"grid",gridTemplateColumns:"1fr 72px 64px 100px",padding:"5px 14px",
               background:rowBg,borderBottom:`1px solid ${T.border}`}}>
               {["INDUSTRY / SECTOR","AVG CHG","REL VOL","SECTOR ETF"].map(h=>(
-                <span key={`ind-head-lagging-${h}`} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,letterSpacing:".06em"}}>{h}</span>
+                <span key={h} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,letterSpacing:".06em"}}>{h}</span>
               ))}
             </div>
             {allInds.filter(i=>i.avgChg<0).sort((a,b)=>a.avgChg-b.avgChg).slice(0,20).map((ind,i,arr)=>{
@@ -1103,7 +1105,7 @@ export default function RotationTab({ etfQuotes = {} }) {
               const sectorGics=Object.entries(GICS).find(([nm])=>nm===ind.sector)?.[1];
               const etfD=sectorGics?etfQuotes[sectorGics.etf]:null;
               return(
-                <div key={`lagging-industry-${ind.industry}-${i}`} style={{display:"grid",gridTemplateColumns:"1fr 72px 64px 100px",
+                <div key={ind.industry+i} style={{display:"grid",gridTemplateColumns:"1fr 72px 64px 100px",
                   padding:"7px 14px",borderBottom:i<arr.length-1?`1px solid ${T.border}`:"none",
                   alignItems:"center",transition:"background .1s"}}
                   onMouseEnter={e=>e.currentTarget.style.background="rgba(255,69,96,.04)"}
@@ -1147,11 +1149,11 @@ export default function RotationTab({ etfQuotes = {} }) {
               SECTOR HEAT MAP — 1D avg change · border intensity = rel vol · GICS standard
             </div>
             <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-              {sectors.map((s, idx)=>{
+              {sectors.map(s=>{
                 const h=heat(s.avgChg); const isS=selSec===s.sector;
                 const etfC=s.etf?(s.etf.d1>0?T.accent:s.etf.d1<0?T.down:T.textMid):null;
                 return(
-                  <div key={`heatmap-${s.sector}-${idx}`}
+                  <div key={s.sector}
                     onClick={()=>{setSelSec(isS?null:s.sector);setView(isS?"heatmap":"overview");}}
                     style={{background:h.bg,border:`${isS?2:Math.ceil(Math.min(s.avgRV*1.5,4))}px solid ${isS?"#fff":h.fg}30`,
                       borderRadius:6,padding:"10px 14px",cursor:"pointer",
@@ -1184,12 +1186,12 @@ export default function RotationTab({ etfQuotes = {} }) {
               MOMENTUM SPECTRUM — screener avg vs ETF benchmark
             </div>
             <div style={{display:"flex",gap:4,alignItems:"flex-end",height:100}}>
-              {sectors.map((s, idx)=>{
+              {sectors.map(s=>{
                 const h=heat(s.avgChg); const barH=Math.max(6,Math.abs(s.avgChg)*7);
                 const etfH=s.etf?Math.max(3,Math.abs(s.etf.d1)*7):0;
                 const isPos=s.avgChg>=0;
                 return(
-                  <div key={`momentum-${s.sector}-${idx}`} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",gap:2,minWidth:0}}>
+                  <div key={s.sector} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",cursor:"pointer",gap:2,minWidth:0}}>
                     {isPos&&(
                       <div style={{width:"100%",position:"relative"}}>
                         <div style={{width:"100%",background:h.fg,borderRadius:"3px 3px 0 0",height:barH,transition:"height .8s"}}/>
