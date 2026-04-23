@@ -7,7 +7,7 @@ import helmet      from "helmet";
 import path        from "path";
 import { fileURLToPath } from "url";
 
-import { PORT, RATE_LIMIT }    from "./config.js";
+import { PORT }    from "./config.js";
 
 // Simple in-process rate limiter (no external dep required)
 const rateLimits = new Map();
