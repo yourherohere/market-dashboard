@@ -1,264 +1,147 @@
-# 🚀 Market Dashboard — Complete Setup Guide
-### For non-coders. Every step explained.
+# Setup Guide — Market Dashboard v2.0
+
+## Prerequisites
+
+- **Node.js** 18+ (20 LTS recommended)
+- **npm** 9+
+- ~500 MB disk space for the database after full bootstrap
 
 ---
 
-## What you need first (one-time installs)
-
-Before anything else, you need two free programs installed on your Mac:
-
-### 1. Install Node.js
-- Go to **https://nodejs.org**
-- Click the big green **"LTS"** button to download
-- Open the downloaded file and click through the installer
-- When done, open Terminal and type: `node --version`
-- You should see something like `v20.11.0` — that means it worked ✅
-
-### 2. Install Xcode Command Line Tools (needed for the database)
-- Open Terminal (press Cmd+Space, type "Terminal", press Enter)
-- Type this and press Enter:
-```
-xcode-select --install
-```
-- A popup will appear — click **Install**
-- Wait for it to finish (takes 2-5 minutes)
-
----
-
-## Step 1 — Copy your project files
-
-Your project folder is called `market-dashboard`. Make sure it contains:
-```
-market-dashboard/
-  package.json
-  vite.config.js
-  index.html
-  server/
-  src/
-```
-
-Open Terminal. Navigate to the folder:
-```bash
-cd ~/Documents/Claude/market-dashboard
-```
-*(Change the path if your folder is somewhere else)*
-
----
-
-## Step 2 — Install all packages (do this ONCE)
+## Installation
 
 ```bash
+git clone https://github.com/yourherohere/market-dashboard.git
+cd market-dashboard
 npm install
+cp .env.example .env
+npm run db:init
+npm run dev
 ```
 
-This downloads all the code libraries the app needs.
-- Takes 1-3 minutes
-- You'll see lots of text scrolling — that's normal
-- When it shows your cursor again, it's done ✅
+Open **http://localhost:5173** — the app loads immediately with live data from Yahoo Finance.
 
 ---
 
-## Step 3 — Set up the database (do this ONCE)
+## Data Pipeline (run once, in order)
 
-```bash
-node server/db/migrate.js
-```
+### 1 — Bootstrap historical prices
 
-This creates the database file (`data/market.db`) with all the tables.
-You should see: `✅  DB ready — schema v5`
+Downloads 2 years of daily OHLCV data for all ~6,500 US stocks from Yahoo Finance.
+Takes **60–90 minutes** with a stable internet connection.
 
----
-
-## Step 4 — Start the server (do this every time)
-
-Open a **new Terminal window** (Cmd+T) and run:
-
-```bash
-cd ~/Documents/Claude/market-dashboard
-node server/index.js
-```
-
-Wait until you see:
-```
-✅  DB ready
-✅  Universe loaded: 6,XXX symbols
-✅  Server ready ✓
-```
-
-**Keep this Terminal window open** — the server must stay running.
-
----
-
-## Step 5 — Start the website (do this every time)
-
-Open **another new Terminal window** (Cmd+T) and run:
-
-```bash
-cd ~/Documents/Claude/market-dashboard
-npm run client:dev
-```
-
-Wait until you see:
-```
-  ➜  Local:   http://localhost:5173/
-```
-
-Then open your browser and go to: **http://localhost:5173**
-
-You should see the Market Dashboard! ✅
-
----
-
-## Step 6 — Download historical data (do this ONCE, takes ~90 min)
-
-This downloads 2 years of price history for all ~6,500 US stocks.
-
-Open **another new Terminal window** and run:
-
-```bash
-cd ~/Documents/Claude/market-dashboard
-npm run bootstrap:2y
-```
-
-You'll see a progress bar:
-```
-  [████████░░░░░░░░░░░░░░░░░░░░░] 28%  1820/6500  ✓1790 ✗18  ETA:32m
-```
-
-- ✓ = successfully downloaded
-- ✗ = failed (will be retried automatically)
-- ETA = estimated time remaining
-
-You can use the dashboard while this runs in the background.
-
----
-
-## Every day after that
-
-Just two commands in two Terminal windows:
-
-**Window 1 (server):**
-```bash
-cd ~/Documents/Claude/market-dashboard
-node server/index.js
-```
-
-**Window 2 (website):**
-```bash
-cd ~/Documents/Claude/market-dashboard
-npm run client:dev
-```
-
-Then open **http://localhost:5173** in your browser.
-
-The server automatically updates stock data at **4:35 PM ET on weekdays**.
-
----
-
-## ❌ Troubleshooting — Common errors
-
-### "Cannot find package 'dotenv'" or similar
-**Fix:** You forgot to run `npm install`
-```bash
-npm install
-```
-
-### "Server not running" in the browser
-**Fix:** You forgot to start the server. Open Terminal and run:
-```bash
-cd ~/Documents/Claude/market-dashboard
-node server/index.js
-```
-
-### "Port 3001 already in use"
-**Fix:** A server is already running. Either use it, or kill it:
-```bash
-lsof -ti:3001 | xargs kill -9
-```
-
-### "Port 5173 already in use"
-**Fix:** Vite is already running. Either use it, or kill it:
-```bash
-lsof -ti:5173 | xargs kill -9
-```
-
-### Browser shows blank white page
-**Fix 1:** Open browser DevTools (Cmd+Option+I → Console tab), read the red error.
-**Fix 2:** Make sure BOTH server and Vite are running.
-**Fix 3:** Hard-refresh the browser: Cmd+Shift+R
-
-### "SqliteError: table X has no column Y"
-**Fix:** The database schema is outdated. Reset it:
-```bash
-rm data/market.db
-node server/db/migrate.js
-```
-*(Your downloaded price history will be lost — run bootstrap again)*
-
-### Bootstrap failed / stopped halfway
-**Fix:** Just resume it — it picks up where it left off:
 ```bash
 npm run bootstrap:2y
 ```
 
-### Bootstrap failed for some symbols — retry only failures
+Monitor progress — the terminal shows `ok=N err=N` counts live. When done:
+
 ```bash
-npm run bootstrap:retry
+npm run bootstrap:status
+# Expected: ok: 6200+, error: <400, pending: 0
 ```
 
-### Data looks stale / not updating
-**Fix:** Manually trigger a data refresh:
+If errors remain:
+
 ```bash
-curl -X POST http://localhost:3001/api/eod/collect
+npm run bootstrap:retry     # retries all errors + symbols with no data
+```
+
+### 2 — Enrich sector/industry/ETF mappings
+
+Maps each symbol to its GICS sector, industry, and corresponding ETF.
+
+```bash
+npm run enrich:sectors
+# Takes ~5 minutes
+```
+
+### 3 — Compute analytics
+
+Calculates RS ranks (1–99), Weinstein stages (1–4), setup scores (0–100),
+pocket pivots, earnings dates, RS vs sector/industry ETF.
+
+```bash
+npm run compute:analytics
+# Takes ~3–5 minutes
+```
+
+### 4 — Compute EMA touch flags
+
+Calculates `touch_ema10/20/50/100/200` and `cross_ema*` flags from OHLC bars
+for the EMA Touch Scanner in the Intel tab.
+
+```bash
+npm run compute:ema
+# Takes ~3 minutes
+```
+
+### 5 — Fetch earnings dates
+
+Pulls upcoming earnings dates for all symbols.
+
+```bash
+npm run compute:earnings
+# Takes ~10 minutes
 ```
 
 ---
 
-## 🔍 Check what's happening (diagnostic commands)
+## Nightly Updates
 
-**Is the server healthy?**
-Open in browser: http://localhost:3001/api/health
+After setup, the server auto-runs nightly at **4:35 PM ET** on weekdays:
 
-**How many stocks are downloaded?**
-Open in browser: http://localhost:3001/api/bootstrap/status
+1. Downloads today's EOD prices
+2. Recomputes returns for updated symbols
+3. Refreshes RS vs sector ETF
+4. Recomputes analytics (RS ranks, stages, scores)
+5. Recomputes EMA touch flags
 
-**See recent EOD collection logs:**
-Open in browser: http://localhost:3001/api/eod/log
-
-**Test the scanner:**
-Open in browser: http://localhost:3001/api/scan/gainers
+No manual action needed.
 
 ---
 
-## 📁 What each file does
+## Validate Data Quality
 
-```
-market-dashboard/
-├── server/index.js          ← The backend server (start this with node)
-├── server/db/migrate.js     ← Creates the database (run once)
-├── server/jobs/bootstrap.js ← Downloads 2yr history (run once)
-├── src/App.jsx              ← The main website code
-├── data/market.db           ← The database (auto-created)
-├── package.json             ← List of packages needed
-└── vite.config.js           ← Website build settings
+The Intel tab → **✅ VALIDATE** shows a health check dashboard. Or via API:
+
+```bash
+curl http://localhost:3001/api/analytics/validate | python3 -m json.tool
 ```
 
 ---
 
-## 🗓 Daily routine
+## Troubleshooting
 
-| Time | What happens |
-|------|-------------|
-| When you start | Run `node server/index.js` + `npm run client:dev` |
-| 4:35 PM ET     | Server automatically downloads today's prices |
-| When you finish | Close the two Terminal windows |
+### "T is not defined" crash
+Replace all tab files from the latest release — this was a theme token scope issue now fixed.
+
+### Bootstrap shows 3000+ errors
+Run `npm run bootstrap:retry` — most are transient Yahoo Finance rate limits.
+
+### EMA Cross returns 0 results
+Run `npm run compute:ema` first. The scanner computes EMA live from `eod_prices`
+but the touch flag columns must be initialized.
+
+### McClellan Oscillator shows "Needs 40+ days"
+The oscillator needs 40+ trading days of A/D history. It self-populates over time
+after each nightly EOD run.
+
+### Port 3001 already in use
+```bash
+kill $(lsof -ti:3001)
+npm run server:start
+```
 
 ---
 
-## 💾 How much space does it use?
+## Environment Variables
 
-| Item | Size |
-|------|------|
-| `node_modules/` | ~200 MB (one-time install) |
-| `data/market.db` (after bootstrap) | ~400 MB |
-| Total | ~600 MB |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3001` | Server port |
+| `NODE_ENV` | `development` | `production` enables static file serving |
+| `LOG_LEVEL` | `info` | `debug` for verbose request logging |
+| `DB_PATH` | `data/market.db` | Override database location |
+| `YF_DISABLE_VERSION_CHECK` | `1` | Suppress Yahoo Finance version warnings |
+

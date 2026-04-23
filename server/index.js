@@ -7,7 +7,27 @@ import helmet      from "helmet";
 import path        from "path";
 import { fileURLToPath } from "url";
 
-import { PORT }    from "./config.js";
+import { PORT, RATE_LIMIT }    from "./config.js";
+
+// Simple in-process rate limiter (no external dep required)
+const rateLimits = new Map();
+function rateLimit({ windowMs, max, keyFn }) {
+  return (req, res, next) => {
+    const key = keyFn ? keyFn(req) : req.ip;
+    const now = Date.now();
+    const entry = rateLimits.get(key) || { count: 0, reset: now + windowMs };
+    if (now > entry.reset) { entry.count = 0; entry.reset = now + windowMs; }
+    entry.count++;
+    rateLimits.set(key, entry);
+    if (entry.count > max) {
+      return res.status(429).json({
+        error: "Too many requests",
+        retryAfter: Math.ceil((entry.reset - now) / 1000),
+      });
+    }
+    next();
+  };
+}
 import { log }     from "./logger.js";
 import { db, runMigrations } from "./db/index.js";
 import { loadSICache, flushSICache } from "./data/enrichment.js";
@@ -55,6 +75,12 @@ app.use(premarketRouter);
 app.use(newsRouter);
 app.use(sectorsRouter);
 app.use(themesRouter);
+// Rate limit expensive endpoints — 30 req/min per IP
+const scanLimit = rateLimit({ windowMs: 60_000, max: 30 });
+app.use("/api/scan",        scanLimit);
+app.use("/api/analytics",   rateLimit({ windowMs: 60_000, max: 60 }));
+app.use("/api/bootstrap",   rateLimit({ windowMs: 60_000, max: 5 }));
+
 app.use(analyticsRouter);
 
 // ── Static frontend in production ─────────────────────────────────────────────
@@ -71,6 +97,14 @@ app.get("/api/cache/stats", (_, res) => {
 app.delete("/api/cache", (_, res) => {
   cache.clear();
   res.json({ ok: true, message: "Cache cleared" });
+});
+
+// Invalidate specific cache namespaces
+app.delete("/api/cache/:namespace", (req, res) => {
+  const ns = req.params.namespace;
+  const keys = cache.keys().filter(k => k.startsWith(ns));
+  keys.forEach(k => cache.del(k));
+  res.json({ ok: true, cleared: keys.length, namespace: ns });
 });
 
 // ── 404 / Error handlers ─────────────────────────────────────────────────────

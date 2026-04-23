@@ -1,226 +1,204 @@
-# Market Dashboard v2.0 — Enterprise Setup
+# 📈 Market Dashboard v2.0
+
+A full-stack enterprise market intelligence platform for US equities — live screener, EOD historical database, sector breadth, EMA scanner, earnings tracker, and Weinstein stage analysis across 6,500+ stocks.
+
+![Stack](https://img.shields.io/badge/stack-React%2BExpress%2BSQLite-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+
+---
+
+## Features
+
+| Tab | What it does |
+|-----|-------------|
+| **Scanner** | Real-time screener — Top Gainers, RS Leaders, EOD Database, 52W Highs, custom filters |
+| **Intel** | RS Ranks, Weinstein Stages, Setup Scores, Sector/Industry Breadth (all 7 periods), EMA Touch Scanner, Earnings Calendar |
+| **Conditions** | Market breadth — NYSE/NASDAQ A/D, McClellan Oscillator, Breadth Score |
+| **Premarket** | Pre-market movers with gap analysis |
+| **Rotation** | Relative Rotation Graph (JdK RS method) |
+| **Sectors** | Sector performance and ETF tracking |
+| **Themes** | Thematic ETF baskets |
+| **Heatmap** | Visual sector/industry heatmap |
+
+---
+
+## Quick Start
+
+```bash
+# 1. Clone and install
+git clone https://github.com/yourherohere/market-dashboard.git
+cd market-dashboard
+npm install
+
+# 2. Configure environment
+cp .env.example .env
+
+# 3. Initialize database
+npm run db:init
+
+# 4. Start server + frontend
+npm run dev
+# Server: http://localhost:3001
+# Frontend: http://localhost:5173
+```
+
+---
+
+## Data Setup (First Run)
+
+Run these commands **in order** after the first `npm run dev`:
+
+```bash
+# Step 1: Download 2 years of OHLCV history (~60–90 min)
+npm run bootstrap:2y
+
+# Step 2: Enrich with sector/industry/ETF mappings
+npm run enrich:sectors
+
+# Step 3: Compute RS ranks, Weinstein stages, setup scores
+npm run compute:analytics
+
+# Step 4: Compute EMA touch/cross flags for EMA scanner
+npm run compute:ema
+
+# Step 5: Fetch upcoming earnings dates
+npm run compute:earnings
+```
+
+After bootstrap, nightly EOD runs automatically at **4:35 PM ET** on weekdays.
+
+---
 
 ## Project Structure
 
 ```
 market-dashboard/
-├── package.json                # All deps (express, better-sqlite3, node-cron, vite)
-├── vite.config.js              # Vite + proxy to :3001
-├── index.html
-├── data/                       # SQLite database (auto-created)
-│   └── market.db
-├── server/                     # Node.js backend (ES modules)
-│   ├── index.js                # Main Express app — START HERE
-│   ├── config.js               # All config: ports, TTLs, batch sizes
-│   ├── logger.js               # Structured logger
-│   ├── cache.js                # In-memory TTL cache
+├── server/
+│   ├── index.js                 # Express app, middleware, startup
+│   ├── config.js                # All config (ports, TTLs, batch sizes)
 │   ├── db/
-│   │   ├── schema.js           # SQLite schema v4 (5 tables)
-│   │   └── index.js            # DB connection + prepared statements
+│   │   ├── schema.js            # SQLite schema v8 + migrations
+│   │   └── index.js             # DB connection + prepared statements
 │   ├── data/
-│   │   ├── yahoo.js            # yf singleton, safeQuote/safeChart/normalise
-│   │   ├── enrichment.js       # 3-tier sector/industry enrichment + DB persistence
-│   │   ├── universe.js         # SEC EDGAR + NASDAQ FTP + DB fallback
-│   │   └── eod.js              # EOD collector + EMA/RSI/return computation
+│   │   ├── eod.js               # EOD price collection + EMA computation
+│   │   ├── yahoo.js             # Yahoo Finance wrapper
+│   │   ├── enrichment.js        # Sector/industry enrichment
+│   │   └── universe.js          # SEC EDGAR universe loader
 │   ├── jobs/
-│   │   ├── scheduler.js        # node-cron: EOD @ 4:35PM ET
-│   │   └── eod-manual.js       # Manual EOD run script
+│   │   ├── bootstrap.js         # Historical data download (2Y)
+│   │   ├── compute-analytics.js # RS ranks, stages, setup scores
+│   │   ├── compute-ema-touch.js # EMA touch/cross flags from OHLC
+│   │   ├── enrich-sectors.js    # Sector/ETF enrichment job
+│   │   └── scheduler.js         # Cron: EOD @ 4:35PM ET
 │   └── routes/
-│       ├── health.js           # /api/health, /api/universe, /api/eod/*
-│       ├── quotes.js           # /api/quotes, /api/charts, /api/search
-│       ├── scanner.js          # All /api/scan/* endpoints + streaming
-│       ├── rrg.js              # /api/rrg (JdK RS method)
-│       ├── premarket.js        # /api/premarket
-│       ├── news.js             # /api/news/:symbol (Finviz + SEC EDGAR)
-│       └── sectors.js          # /api/live/*, /api/etf/*, /api/advance-decline
-└── src/                        # React frontend (Vite)
-    ├── main.jsx                # React entry point
-    ├── App.jsx                 # Root: loads data, tab router, header
-    ├── api/client.js           # Typed API client (all endpoints)
-    ├── constants/gics.js       # GICS sector/ETF registry (11 sectors, 41 sub-ETFs)
-    ├── hooks/useTheme.js       # Dark/light theme context
-    ├── utils/format.js         # pct, fmtMcap, calcRet, sparkPath, etc.
-    └── components/
-        ├── common/index.jsx    # Spark, McapBadge, ScoreDial, LoadingDots, UniverseStatus
-        └── tabs/               # One file per tab (lazy-loaded)
-            ├── ScannerTab.jsx
-            ├── PremarketTab.jsx
-            ├── SectorsTab.jsx
-            ├── ConditionsTab.jsx
-            ├── RotationTab.jsx
-            ├── ThemesTab.jsx
-            ├── CockpitTab.jsx
-            └── HeatmapTab.jsx
+│       ├── analytics.js         # /api/analytics/* (Intel tab backend)
+│       ├── scanner.js           # /api/scan/* (screener endpoints)
+│       ├── quotes.js            # /api/quotes, /api/charts
+│       ├── sectors.js           # /api/live/*, /api/etf/*
+│       └── health.js            # /api/health, /api/universe
+└── src/
+    ├── App.jsx                  # Root — theme, tabs, header
+    ├── hooks/useTheme.js        # Day/Night theme context + CSS vars
+    ├── utils/theme.js           # Semantic color helpers (gc, rsColor)
+    └── components/tabs/         # One file per tab (lazy-loaded)
 ```
-
-## Quick Start
-
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Initialize database (creates data/market.db with schema)
-npm run db:init
-
-# 3. Start everything (server + Vite dev server)
-npm run dev
-```
-
-## EOD Data Collection
-
-```bash
-# Runs automatically at 4:35 PM ET on weekdays via node-cron
-
-# Manual run (collect today's prices for all ~6500 symbols)
-npm run eod:collect
-
-# Force re-collect even if today already done
-node server/jobs/eod-manual.js --force
-
-# Collect for specific symbols only
-node server/jobs/eod-manual.js --symbols AAPL,MSFT,NVDA
-
-# Trigger via API (POST)
-curl -X POST http://localhost:3001/api/eod/collect -H "Content-Type: application/json" -d '{"force":false}'
-```
-
-## Database Schema
-
-| Table | Description |
-|-------|-------------|
-| `universe` | 6,500 US stocks (symbol, name, exchange, sector, industry) |
-| `eod_prices` | Daily OHLCV for all symbols — indexed by (symbol, date) |
-| `eod_returns` | Computed returns: 1D/1W/1M/3M/6M/YTD/1Y + EMA20/50/200 + RSI |
-| `sector_cache` | Persisted sector/industry lookups — survives server restarts |
-| `eod_log` | Collection run history (date, ok count, error count, duration) |
-
-## Universe Loading
-
-The US universe loads from 3 sources in priority order:
-1. **SEC EDGAR** `company_tickers_exchange.json` — ~6,500 symbols
-2. **NASDAQ FTP** `nasdaqlisted.txt` + `otherlisted.txt` — fallback
-3. **Local DB cache** — always works after first successful load
-
-## Key API Endpoints
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /api/health` | Status, universe count, EOD stats |
-| `GET /api/universe` | Universe metadata |
-| `POST /api/eod/collect` | Trigger manual EOD collection |
-| `GET /api/eod/returns/:sym` | DB-backed historical returns for a symbol |
-| `GET /api/eod/log` | Recent collection run history |
-| `GET /api/scan/full/stream` | SSE streaming universe scan |
-| `GET /api/advance-decline` | NYSE/NASDAQ/SP500 A/D breadth |
-| `DELETE /api/cache` | Clear in-memory cache |
 
 ---
 
-## Historical Data Bootstrap
+## Database Schema
 
-### First-time setup (recommended order)
+| Table | Rows | Description |
+|-------|------|-------------|
+| `universe` | ~6,600 | US stocks — symbol, name, exchange, sector, industry, ETF mappings |
+| `eod_prices` | ~3.4M | Daily OHLCV — indexed by (symbol, date) |
+| `eod_returns` | ~6,600 | Computed analytics — returns, EMAs, RS ranks, stages, scores |
+| `bootstrap_status` | ~6,600 | Per-symbol download state for retry logic |
+| `spy_prices` | ~520 | SPY daily closes for RS computation |
+
+---
+
+## API Endpoints
+
+### Analytics (Intel Tab)
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/analytics/setup` | Top setups with RS rank, stage, score filters |
+| `GET /api/analytics/ema-cross` | EMA touch scanner (Pine Script logic) |
+| `GET /api/analytics/internals` | Breadth metrics, sector/industry breadth |
+| `GET /api/analytics/earnings` | Upcoming earnings with analytics |
+| `GET /api/analytics/validate` | Data quality health check |
+| `GET /api/analytics/symbol/:sym` | Full symbol detail |
+
+### Scanner
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/scan/eod` | EOD database scan with full filter set |
+| `GET /api/scan/stream` | Server-sent events streaming scan |
+
+### Utility
+| Endpoint | Description |
+|----------|-------------|
+| `GET /api/health` | Server status, universe count, EOD stats |
+| `DELETE /api/cache` | Clear all in-memory cache |
+| `DELETE /api/cache/:namespace` | Clear specific cache namespace |
+| `POST /api/bootstrap/start` | Trigger data download via API |
+| `GET /api/bootstrap/status` | Download progress |
+
+---
+
+## EMA Touch Scanner
+
+Exact port of Pine Script `ta.ema()` logic:
+
+```
+touch(period) = candle.low ≤ EMA(period) ≤ candle.high
+```
+
+Supports:
+- **Multi-select EMA periods**: 10, 20, 50, 100, 200
+- **Touch modes**: Min touches (≥N) or All selected EMAs
+- **Signal strength**: 1=green, 2=yellow, 3=orange, 4=red, 5=purple
+- Always computed live from `eod_prices` — never stale stored values
+
+---
+
+## Bootstrap Commands
 
 ```bash
-# 1. Install all dependencies
-npm install
-
-# 2. Initialize database schema
-npm run db:init
-
-# 3. Start server (keeps running, loads universe, warms cache)
-npm run server:start
-# Wait until you see: "✅ Universe loaded: 6,XXX symbols"
-
-# 4. In a new terminal — download 2 years of history for ALL ~6,500 symbols
-npm run bootstrap:2y
+npm run bootstrap:2y        # Download 2 years history (all 6,500 symbols)
+npm run bootstrap:retry     # Retry failed + symbols with no price data
+npm run bootstrap:status    # Show download status breakdown
+npm run bootstrap:reset     # Wipe and re-download everything
 ```
 
-### Bootstrap options
+---
 
-```bash
-# Download 2 years (default ~520 trading days per symbol)
-npm run bootstrap:2y
+## Theme System
 
-# Download 1 year only (~252 trading days)
-npm run bootstrap:1y
+Day/Night mode via CSS custom properties. Toggle with the button in the header.
 
-# Retry only symbols that failed on previous run (exit code 1 / timeout)
-npm run bootstrap:retry
+All color tokens are injected into `:root` on toggle:
 
-# Wipe all existing price data and re-download from scratch
-npm run bootstrap:reset
+```css
+var(--clr-up)       /* gains green */
+var(--clr-dn)       /* losses red  */
+var(--clr-surface)  /* card background */
+var(--clr-border)   /* standard border */
+var(--clr-text)     /* primary text */
 ```
 
-### Performance expectations
+---
 
-| Universe size | Batch size | Estimated time |
-|--------------|-----------|----------------|
-| 6,500 symbols | 12 concurrent | 60–90 minutes |
-| With retries  | 12 concurrent | +5–10 minutes |
-| Returns computation | SQLite-only | 2–4 minutes |
+## Tech Stack
 
-**Database size after 2-year bootstrap:**
-- `eod_prices` table: ~6,500 × 520 = ~3.4M rows ≈ 250–400 MB
-- `eod_returns` table: 6,500 rows ≈ 2 MB
-- `spy_prices` table: 520 rows ≈ negligible
-- Total DB: 300–500 MB (WAL + indexes)
+- **Frontend**: React 18, Vite 5, JetBrains Mono, Lightweight Charts
+- **Backend**: Node.js (ES modules), Express 4, Better-SQLite3
+- **Data**: Yahoo Finance 2 (via `yahoo-finance2`), SEC EDGAR, NASDAQ FTP
+- **Scheduler**: node-cron (4:35 PM ET weekday EOD)
+- **No external auth / no cloud deps** — fully self-hosted
 
-### Bootstrap API (control from browser/curl)
+---
 
-```bash
-# Start bootstrap via API (non-blocking, runs in background)
-curl -X POST http://localhost:3001/api/bootstrap/start \
-  -H "Content-Type: application/json" \
-  -d '{"years":2,"retryOnly":false,"reset":false}'
+## License
 
-# Check progress
-curl http://localhost:3001/api/bootstrap/status
-
-# Stop in-progress bootstrap
-curl -X POST http://localhost:3001/api/bootstrap/stop
-```
-
-### What gets computed per symbol
-
-After downloading raw OHLCV data, `computeReturnRow()` calculates and stores:
-
-**Period returns:** 1D, 1W, 2W, 1M, 2M, 3M, 6M, 9M, 1Y, 2Y, MTD, QTD, YTD
-
-**Moving averages:** SMA20, SMA50, SMA150, SMA200, EMA20, EMA50, EMA200
-
-**EMA positioning flags:** above_ema20, above_ema50, above_ema200, above_sma150, above_sma200
-
-**52-week range:** hi52, lo52, pct_hi52 (price as % of 52W high), pct_lo52
-
-**Technical indicators:** RSI(14), RSI(2), ADR%(14), ATR(14), Beta(252)
-
-**Relative strength vs SPY:** RS_1M, RS_3M, RS_6M, RS_12M (IBD-style)
-
-### EOD nightly update
-
-After bootstrap, the nightly EOD job (4:35 PM ET weekdays) only needs to download 1–5 days of data per symbol (much faster). It then recomputes all returns from the stored history.
-
-```bash
-# Manual daily EOD update (only downloads missing dates)
-npm run eod:collect
-
-# Force re-download today's prices even if already stored
-node server/jobs/eod-manual.js --force
-```
-
-### Schema
-
-```sql
--- Fast time-series reads (WITHOUT ROWID = no extra rowid column)
-SELECT date, close, volume FROM eod_prices
-WHERE symbol = 'AAPL' ORDER BY date DESC LIMIT 260;
-
--- Cross-sectional (all symbols on a date, for breadth)
-SELECT symbol, close FROM eod_prices WHERE date = '2024-03-15';
-
--- Screener from returns table (instant, no Yahoo needed)
-SELECT r.*, u.sector FROM eod_returns r
-JOIN universe u ON r.symbol = u.symbol
-WHERE r.d1 > 3 AND r.volume > 500000
-ORDER BY r.d1 DESC LIMIT 50;
-```
+MIT — see [LICENSE](LICENSE)
