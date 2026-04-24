@@ -21,6 +21,226 @@ async function apiFetch(p, o={}) {
   return r.json();
 }
 
+// ── Mini bar chart ────────────────────────────────────────────────────────────
+function MiniBarChart({ data=[], height=40, colorPos="var(--clr-accent)", colorNeg="var(--clr-dn)" }) {
+  if (!data.length) return (
+    <div style={{height, background:T.row, borderRadius:3, display:"flex",
+      alignItems:"center", justifyContent:"center"}}>
+      <span style={{fontFamily:"monospace",fontSize:7,color:T.textFaint}}>NO DATA</span>
+    </div>
+  );
+  const vals = data.map(d => d.value ?? 0);
+  const max  = Math.max(...vals.map(Math.abs), 0.001);
+  const half = Math.floor(height/2) - 1;
+  return (
+    <div style={{position:"relative",height,background:T.row,borderRadius:3,overflow:"hidden"}}>
+      {data.map((d,i)=>{
+        const v  = d.value ?? 0;
+        const px = Math.max(1, Math.round(Math.abs(v)/max*half));
+        const up = v >= 0;
+        return <div key={i} style={{
+          position:"absolute", left:`${(i/data.length)*100}%`,
+          width:`${(1/data.length)*100}%`, height:px,
+          ...(up ? {bottom:"50%"} : {top:"50%"}),
+          background: up ? colorPos : colorNeg, opacity:.85,
+        }}/>;
+      })}
+      <div style={{position:"absolute",top:"50%",left:0,right:0,height:1,background:T.textGhost}}/>
+    </div>
+  );
+}
+
+// ── Gauge widget ─────────────────────────────────────────────────────────────
+function Gauge({ value, min=-0.1, max=0.1, label="" }) {
+  const norm   = Math.max(0, Math.min(1, (value - min) / (max - min)));
+  const color  = value > 0.02 ? T.accent : value < -0.02 ? T.down : "#ffe040";
+  const deg    = norm * 180 - 90;   // -90° to +90°
+  return (
+    <div style={{textAlign:"center"}}>
+      <svg width={90} height={52} viewBox="0 0 90 52">
+        {/* Track */}
+        <path d="M 10 45 A 35 35 0 0 1 80 45" fill="none" stroke={T.border2} strokeWidth={6}/>
+        {/* Fill */}
+        <path d={`M 10 45 A 35 35 0 0 1 80 45`} fill="none"
+          stroke={color} strokeWidth={6} strokeDasharray="110"
+          strokeDashoffset={110*(1-norm)} style={{transition:"stroke-dashoffset .8s"}}/>
+        {/* Needle */}
+        <line x1={45} y1={45}
+          x2={45 + 30*Math.cos((deg-90)*Math.PI/180)}
+          y2={45 + 30*Math.sin((deg-90)*Math.PI/180)}
+          stroke={color} strokeWidth={2} strokeLinecap="round"/>
+        <circle cx={45} cy={45} r={3} fill={color}/>
+        <text x={45} y={34} textAnchor="middle" fontFamily="monospace" fontSize={10}
+          fontWeight={700} fill={color}>{value > 0 ? "+" : ""}{value?.toFixed(3)}</text>
+      </svg>
+      <div style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,marginTop:-4}}>{label}</div>
+    </div>
+  );
+}
+
+// ── Stage badge ───────────────────────────────────────────────────────────────
+function StageBadge({ stage }) {
+  const map = {
+    1: { c:"#ffe040", bg:"rgba(255,224,64,.12)",  l:"S1" },
+    2: { c:T.accent, bg:"rgba(0,232,122,.15)",   l:"S2" },
+    3: { c:"#ff9f1c", bg:"rgba(255,159,28,.12)",  l:"S3" },
+    4: { c:T.down, bg:"rgba(255,69,96,.12)",   l:"S4" },
+  };
+  const s = map[stage];
+  if (!s) return null;
+  return (
+    <span title={`Stage ${stage}`} style={{
+      fontFamily:"monospace", fontSize:8, fontWeight:700, color:s.c,
+      background:s.bg, padding:"2px 5px", borderRadius:3,
+    }}>{s.l}</span>
+  );
+}
+
+// ── RS Rank badge ─────────────────────────────────────────────────────────────
+function RSBadge({ rank }) {
+  if (rank == null) return <span style={{fontFamily:"monospace",fontSize:8,color:T.textFaint}}>—</span>;
+  const c = rank>=90?T.accent:rank>=80?T.accent:rank>=70?"#ffe040":rank>=50?"#ff9f1c":T.down;
+  return (
+    <span style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color:c,
+      background:`${c}18`,padding:"2px 6px",borderRadius:3}}>
+      {rank}
+    </span>
+  );
+}
+
+// ── Setup score bar ───────────────────────────────────────────────────────────
+function SetupBar({ score }) {
+  if (score == null) return null;
+  const c = score>=80?T.accent:score>=60?T.accent:score>=40?"#ffe040":"#ff9f1c";
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:5}}>
+      <div style={{width:48,height:4,background:T.textGhost2,borderRadius:2,overflow:"hidden"}}>
+        <div style={{width:`${score}%`,height:"100%",background:c,borderRadius:2}}/>
+      </div>
+      <span style={{fontFamily:"monospace",fontSize:9,color:c,fontWeight:600}}>{score}</span>
+    </div>
+  );
+}
+
+// ── Earnings flag ─────────────────────────────────────────────────────────────
+function EarningsBadge({ days }) {
+  if (days == null) return null;
+  const c   = days <= 2 ? T.down : days <= 5 ? "#ff9f1c" : "#ffe040";
+  const lbl = days === 0 ? "TODAY" : days === 1 ? "TOMORROW" : `${days}D`;
+  return (
+    <span title={`Earnings in ${days} days`} style={{
+      fontFamily:"monospace", fontSize:7, fontWeight:700, color:c,
+      background:`${c}15`, border:`1px solid ${c}40`,
+      padding:"1px 4px", borderRadius:2, letterSpacing:".04em",
+    }}>📅 {lbl}</span>
+  );
+}
+
+// ── Position Size Calculator ──────────────────────────────────────────────────
+function RiskCalculator({ prefill={} }) {
+  const [account, setAccount] = useState("100000");
+  const [riskPct, setRiskPct] = useState("1");
+  const [entry,   setEntry]   = useState(prefill.price ? String(prefill.price.toFixed(2)) : "");
+  const [stop,    setStop]    = useState("");
+  const [adr,     setAdr]     = useState(prefill.adr14 ? String(prefill.adr14.toFixed(1)) : "");
+
+  const acc    = parseFloat(account) || 0;
+  const rPct   = parseFloat(riskPct) || 1;
+  const ent    = parseFloat(entry)   || 0;
+  const stp    = parseFloat(stop)    || 0;
+  const adrVal = parseFloat(adr)     || 0;
+
+  const dollarRisk  = acc * rPct / 100;
+  const stopDist    = ent > 0 && stp > 0 ? ent - stp : 0;
+  const shares      = stopDist > 0 ? Math.floor(dollarRisk / stopDist) : 0;
+  const posSize     = shares * ent;
+  const posPct      = acc > 0 ? (posSize / acc * 100).toFixed(1) : 0;
+  const r1          = ent + stopDist;        // 1R target
+  const r2          = ent + stopDist * 2;   // 2R
+  const r3          = ent + stopDist * 3;   // 3R
+
+  // ATR-based stop suggestion
+  const atrStop     = adrVal > 0 && ent > 0 ? (ent * (1 - adrVal/100 * 1.5)).toFixed(2) : null;
+
+  const F = ({label, value, color="var(--clr-text)"}) => (
+    <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",
+      borderBottom:`1px solid ${T.border}`}}>
+      <span style={{fontFamily:"monospace",fontSize:9,color:T.textDim}}>{label}</span>
+      <span style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color}}>{value}</span>
+    </div>
+  );
+
+  const I = ({label, value, onChange, prefix="", suffix="", width=90}) => (
+    <div style={{display:"flex",flexDirection:"column",gap:3}}>
+      <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>{label}</span>
+      <div style={{display:"flex",alignItems:"center",gap:3,background:T.inputBg,
+        border:`1px solid ${T.border2}`,borderRadius:3,padding:"5px 8px"}}>
+        {prefix&&<span style={{fontFamily:"monospace",fontSize:10,color:T.textDim}}>{prefix}</span>}
+        <input name="value" value={value} onChange={e=>onChange(e.target.value)}
+          style={{width,background:"transparent",border:"none",outline:"none",
+            fontFamily:"monospace",fontSize:11,color:T.text}}/>
+        {suffix&&<span style={{fontFamily:"monospace",fontSize:10,color:T.textDim}}>{suffix}</span>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,padding:"14px 16px"}}>
+      <div style={{fontFamily:"monospace",fontSize:9,color:T.textFaint,letterSpacing:".14em",
+        marginBottom:12}}>⚖ POSITION SIZE CALCULATOR</div>
+
+      {prefill.symbol && (
+        <div style={{fontFamily:"monospace",fontSize:9,color:T.accent,marginBottom:8}}>
+          {prefill.symbol} · Stage {prefill.stage} · RS {prefill.rs_rank}
+        </div>
+      )}
+
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:12}}>
+        <I label="Account $"    value={account} onChange={setAccount} prefix="$" width={80}/>
+        <I label="Risk %"       value={riskPct} onChange={setRiskPct} suffix="%" width={40}/>
+        <I label="Entry Price"  value={entry}   onChange={setEntry}   prefix="$" width={70}/>
+        <I label="Stop Price"   value={stop}    onChange={setStop}    prefix="$" width={70}/>
+        <I label="ADR%"         value={adr}     onChange={setAdr}     suffix="%" width={40}/>
+      </div>
+
+      {atrStop && !stop && (
+        <div style={{fontFamily:"monospace",fontSize:8,color:"#ff9f1c",marginBottom:8,
+          cursor:"pointer"}} onClick={()=>setStop(atrStop)}>
+          ↗ ATR-based stop suggestion: ${atrStop} (1.5× ADR below entry) — click to use
+        </div>
+      )}
+
+      {shares > 0 && (
+        <div>
+          <F label="Dollar Risk"   value={`$${dollarRisk.toFixed(0)} (${rPct}%)`} color="#ff9f1c"/>
+          <F label="Stop Distance" value={`$${stopDist.toFixed(2)} (${(stopDist/ent*100).toFixed(1)}%)`}/>
+          <F label="Shares"        value={shares.toLocaleString()} color="var(--clr-accent)"/>
+          <F label="Position Size" value={`$${posSize.toLocaleString(undefined,{maximumFractionDigits:0})} (${posPct}% of acct)`}/>
+          <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
+            {[[1,r1,T.accent],[2,r2,T.accent],[3,r3,"#00d4ff"]].map(([n,t,c])=>(
+              <div key={n} style={{background:`${c}10`,border:`1px solid ${c}30`,
+                borderRadius:4,padding:"5px 10px",textAlign:"center"}}>
+                <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint}}>{n}R TARGET</div>
+                <div style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:c}}>
+                  ${t.toFixed(2)}
+                </div>
+                <div style={{fontFamily:"monospace",fontSize:8,color:c}}>
+                  +${(shares*(t-ent)).toFixed(0)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {!shares && entry && stop && (
+        <div style={{fontFamily:"monospace",fontSize:9,color:T.down}}>
+          {stp >= ent ? "Stop must be below entry" : "Enter valid entry and stop prices"}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── TABS ──────────────────────────────────────────────────────────────────────
 const TABS = [
   { key:"internals",  label:"INTERNALS"    },
@@ -37,218 +257,6 @@ export default function IntelligenceTab() {
   const themeKey = useTheme();
   const T        = THEME[themeKey] || THEME.night;
   const dark     = themeKey === "night";
-
-  // ---------- Helper components (moved inside for T access) ----------
-  function MiniBarChart({ data=[], height=40, colorPos="var(--clr-accent)", colorNeg="var(--clr-dn)" }) {
-    if (!data.length) return (
-      <div style={{height, background:T.row, borderRadius:3, display:"flex",
-        alignItems:"center", justifyContent:"center"}}>
-        <span style={{fontFamily:"monospace",fontSize:7,color:T.textFaint}}>NO DATA</span>
-      </div>
-    );
-    const vals = data.map(d => d.value ?? 0);
-    const max  = Math.max(...vals.map(Math.abs), 0.001);
-    const half = Math.floor(height/2) - 1;
-    return (
-      <div style={{position:"relative",height,background:T.row,borderRadius:3,overflow:"hidden"}}>
-        {data.map((d,i)=>{
-          const v  = d.value ?? 0;
-          const px = Math.max(1, Math.round(Math.abs(v)/max*half));
-          const up = v >= 0;
-          return <div key={i} style={{
-            position:"absolute", left:`${(i/data.length)*100}%`,
-            width:`${(1/data.length)*100}%`, height:px,
-            ...(up ? {bottom:"50%"} : {top:"50%"}),
-            background: up ? colorPos : colorNeg, opacity:.85,
-          }}/>;
-        })}
-        <div style={{position:"absolute",top:"50%",left:0,right:0,height:1,background:T.textGhost}}/>
-      </div>
-    );
-  }
-
-  function Gauge({ value, min=-0.1, max=0.1, label="" }) {
-    const norm   = Math.max(0, Math.min(1, (value - min) / (max - min)));
-    const color  = value > 0.02 ? T.accent : value < -0.02 ? T.down : "#ffe040";
-    const deg    = norm * 180 - 90;
-    return (
-      <div style={{textAlign:"center"}}>
-        <svg width={90} height={52} viewBox="0 0 90 52">
-          <path d="M 10 45 A 35 35 0 0 1 80 45" fill="none" stroke={T.border2} strokeWidth={6}/>
-          <path d={`M 10 45 A 35 35 0 0 1 80 45`} fill="none"
-            stroke={color} strokeWidth={6} strokeDasharray="110"
-            strokeDashoffset={110*(1-norm)} style={{transition:"stroke-dashoffset .8s"}}/>
-          <line x1={45} y1={45}
-            x2={45 + 30*Math.cos((deg-90)*Math.PI/180)}
-            y2={45 + 30*Math.sin((deg-90)*Math.PI/180)}
-            stroke={color} strokeWidth={2} strokeLinecap="round"/>
-          <circle cx={45} cy={45} r={3} fill={color}/>
-          <text x={45} y={34} textAnchor="middle" fontFamily="monospace" fontSize={10}
-            fontWeight={700} fill={color}>{value > 0 ? "+" : ""}{value?.toFixed(3)}</text>
-        </svg>
-        <div style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,marginTop:-4}}>{label}</div>
-      </div>
-    );
-  }
-
-  function StageBadge({ stage }) {
-    const map = {
-      1: { c:"#ffe040", bg:"rgba(255,224,64,.12)",  l:"S1" },
-      2: { c:T.accent, bg:"rgba(0,232,122,.15)",   l:"S2" },
-      3: { c:"#ff9f1c", bg:"rgba(255,159,28,.12)",  l:"S3" },
-      4: { c:T.down, bg:"rgba(255,69,96,.12)",   l:"S4" },
-    };
-    const s = map[stage];
-    if (!s) return null;
-    return (
-      <span title={`Stage ${stage}`} style={{
-        fontFamily:"monospace", fontSize:8, fontWeight:700, color:s.c,
-        background:s.bg, padding:"2px 5px", borderRadius:3,
-      }}>{s.l}</span>
-    );
-  }
-
-  function RSBadge({ rank }) {
-    if (rank == null) return <span style={{fontFamily:"monospace",fontSize:8,color:T.textFaint}}>—</span>;
-    const c = rank>=90?T.accent:rank>=80?T.accent:rank>=70?"#ffe040":rank>=50?"#ff9f1c":T.down;
-    return (
-      <span style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color:c,
-        background:`${c}18`,padding:"2px 6px",borderRadius:3}}>
-        {rank}
-      </span>
-    );
-  }
-
-  function SetupBar({ score }) {
-    if (score == null) return null;
-    const c = score>=80?T.accent:score>=60?T.accent:score>=40?"#ffe040":"#ff9f1c";
-    return (
-      <div style={{display:"flex",alignItems:"center",gap:5}}>
-        <div style={{width:48,height:4,background:T.textGhost2,borderRadius:2,overflow:"hidden"}}>
-          <div style={{width:`${score}%`,height:"100%",background:c,borderRadius:2}}/>
-        </div>
-        <span style={{fontFamily:"monospace",fontSize:9,color:c,fontWeight:600}}>{score}</span>
-      </div>
-    );
-  }
-
-  function EarningsBadge({ days }) {
-    if (days == null) return null;
-    const c   = days <= 2 ? T.down : days <= 5 ? "#ff9f1c" : "#ffe040";
-    const lbl = days === 0 ? "TODAY" : days === 1 ? "TOMORROW" : `${days}D`;
-    return (
-      <span title={`Earnings in ${days} days`} style={{
-        fontFamily:"monospace", fontSize:7, fontWeight:700, color:c,
-        background:`${c}15`, border:`1px solid ${c}40`,
-        padding:"1px 4px", borderRadius:2, letterSpacing:".04em",
-      }}>📅 {lbl}</span>
-    );
-  }
-
-  function RiskCalculator({ prefill={} }) {
-    const [account, setAccount] = useState("100000");
-    const [riskPct, setRiskPct] = useState("1");
-    const [entry,   setEntry]   = useState(prefill.price ? String(prefill.price.toFixed(2)) : "");
-    const [stop,    setStop]    = useState("");
-    const [adr,     setAdr]     = useState(prefill.adr14 ? String(prefill.adr14.toFixed(1)) : "");
-
-    const acc    = parseFloat(account) || 0;
-    const rPct   = parseFloat(riskPct) || 1;
-    const ent    = parseFloat(entry)   || 0;
-    const stp    = parseFloat(stop)    || 0;
-    const adrVal = parseFloat(adr)     || 0;
-
-    const dollarRisk  = acc * rPct / 100;
-    const stopDist    = ent > 0 && stp > 0 ? ent - stp : 0;
-    const shares      = stopDist > 0 ? Math.floor(dollarRisk / stopDist) : 0;
-    const posSize     = shares * ent;
-    const posPct      = acc > 0 ? (posSize / acc * 100).toFixed(1) : 0;
-    const r1          = ent + stopDist;
-    const r2          = ent + stopDist * 2;
-    const r3          = ent + stopDist * 3;
-
-    const atrStop     = adrVal > 0 && ent > 0 ? (ent * (1 - adrVal/100 * 1.5)).toFixed(2) : null;
-
-    const F = ({label, value, color = T.text}) => (
-      <div style={{display:"flex",justifyContent:"space-between",padding:"5px 0",
-        borderBottom:`1px solid ${T.border}`}}>
-        <span style={{fontFamily:"monospace",fontSize:9,color:T.textDim}}>{label}</span>
-        <span style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color}}>{value}</span>
-      </div>
-    );
-
-    const I = ({label, value, onChange, prefix="", suffix="", width=90}) => (
-      <div style={{display:"flex",flexDirection:"column",gap:3}}>
-        <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>{label}</span>
-        <div style={{display:"flex",alignItems:"center",gap:3,background:T.inputBg,
-          border:`1px solid ${T.border2}`,borderRadius:3,padding:"5px 8px"}}>
-          {prefix&&<span style={{fontFamily:"monospace",fontSize:10,color:T.textDim}}>{prefix}</span>}
-          <input value={value} onChange={e=>onChange(e.target.value)}
-            style={{width,background:"transparent",border:"none",outline:"none",
-              fontFamily:"monospace",fontSize:11,color:T.text}}/>
-          {suffix&&<span style={{fontFamily:"monospace",fontSize:10,color:T.textDim}}>{suffix}</span>}
-        </div>
-      </div>
-    );
-
-    return (
-      <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,padding:"14px 16px"}}>
-        <div style={{fontFamily:"monospace",fontSize:9,color:T.textFaint,letterSpacing:".14em",
-          marginBottom:12}}>⚖ POSITION SIZE CALCULATOR</div>
-
-        {prefill.symbol && (
-          <div style={{fontFamily:"monospace",fontSize:9,color:T.accent,marginBottom:8}}>
-            {prefill.symbol} · Stage {prefill.stage} · RS {prefill.rs_rank}
-          </div>
-        )}
-
-        <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:12}}>
-          <I label="Account $"    value={account} onChange={setAccount} prefix="$" width={80}/>
-          <I label="Risk %"       value={riskPct} onChange={setRiskPct} suffix="%" width={40}/>
-          <I label="Entry Price"  value={entry}   onChange={setEntry}   prefix="$" width={70}/>
-          <I label="Stop Price"   value={stop}    onChange={setStop}    prefix="$" width={70}/>
-          <I label="ADR%"         value={adr}     onChange={setAdr}     suffix="%" width={40}/>
-        </div>
-
-        {atrStop && !stop && (
-          <div style={{fontFamily:"monospace",fontSize:8,color:"#ff9f1c",marginBottom:8,
-            cursor:"pointer"}} onClick={()=>setStop(atrStop)}>
-            ↗ ATR-based stop suggestion: ${atrStop} (1.5× ADR below entry) — click to use
-          </div>
-        )}
-
-        {shares > 0 && (
-          <div>
-            <F label="Dollar Risk"   value={`$${dollarRisk.toFixed(0)} (${rPct}%)`} color="#ff9f1c"/>
-            <F label="Stop Distance" value={`$${stopDist.toFixed(2)} (${(stopDist/ent*100).toFixed(1)}%)`}/>
-            <F label="Shares"        value={shares.toLocaleString()} color={T.accent}/>
-            <F label="Position Size" value={`$${posSize.toLocaleString(undefined,{maximumFractionDigits:0})} (${posPct}% of acct)`}/>
-            <div style={{marginTop:8,display:"flex",gap:6,flexWrap:"wrap"}}>
-              {[[1,r1,T.accent],[2,r2,T.accent],[3,r3,"#00d4ff"]].map(([n,t,c])=>(
-                <div key={n} style={{background:`${c}10`,border:`1px solid ${c}30`,
-                  borderRadius:4,padding:"5px 10px",textAlign:"center"}}>
-                  <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint}}>{n}R TARGET</div>
-                  <div style={{fontFamily:"monospace",fontSize:12,fontWeight:700,color:c}}>
-                    ${t.toFixed(2)}
-                  </div>
-                  <div style={{fontFamily:"monospace",fontSize:8,color:c}}>
-                    +${(shares*(t-ent)).toFixed(0)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-        {!shares && entry && stop && (
-          <div style={{fontFamily:"monospace",fontSize:9,color:T.down}}>
-            {stp >= ent ? "Stop must be below entry" : "Enter valid entry and stop prices"}
-          </div>
-        )}
-      </div>
-    );
-  }
-  // ---------- End of helper components ----------
-
   const [tab,    setTab]    = useState("internals");
   const [intern, setIntern] = useState(null);
   const [setups, setSetups] = useState([]);
@@ -257,13 +265,15 @@ export default function IntelligenceTab() {
   const [loading,setLoading]= useState({});
   const [riskPf, setRiskPf] = useState({});
 
+  // Sector / industry dropdowns (loaded from API)
   const [sectorsList,    setSectorsList]    = useState([]);
   const [industriesList, setIndustriesList] = useState([]);
 
+  // EMA Cross scanner state
   const [emaCrossF, setEmaCrossF] = useState({
-    emas:       ["10","20"],
-    touchMode:  "min",
-    minTouches: "1",
+    emas:       ["10","20"],   // selected EMA periods (Pine: ema10_en, ema20_en ...)
+    touchMode:  "min",         // "min" = Min touches(≥) | "all" = All selected
+    minTouches: "1",           // Pine: minTouches input
     minPrice:   "5",
     minVol:     "100000",
     minDolVol:  "",
@@ -273,15 +283,18 @@ export default function IntelligenceTab() {
   });
   const [emaCrossResults, setEmaCrossResults] = useState([]);
   const [emaCrossLoading, setEmaCrossLoading] = useState(false);
-  const [emaCrossSort, setEmaCrossSort] = useState({ k:"cross_dist_pct_abs", d:1 });
+  const [emaCrossSort, setEmaCrossSort] = useState({ k:"cross_dist_pct_abs", d:1 });  // sort by abs distance, asc = closest first
 
+  // Validate state
   const [validateData, setValidateData] = useState(null);
   const [validateLoading, setValidateLoading] = useState(false);
 
+  // Breadth table period + filter state
   const [breadthPeriod,       setBreadthPeriod]       = useState("avg3m");
   const [breadthSectorFilter, setBreadthSectorFilter] = useState("");
   const [breadthShowAll,      setBreadthShowAll]      = useState(false);
 
+  // Symbol search state
   const [symQuery,  setSymQuery]  = useState("");
   const [symResult, setSymResult] = useState(null);
   const [symErr,    setSymErr]    = useState(null);
@@ -291,14 +304,14 @@ export default function IntelligenceTab() {
     minRS:"0",     maxRS:"99",
     minPrice:"1",  maxPrice:"",
     minVol:"100000",
-    minDolVol:"",
-    industries:[],
+    minDolVol:"",      // dollar volume filter, e.g. "1000000" = $1M
+    industries:[],     // industry names to include
     stage:"0", emaFilter:"any",
     sectors:[],
     vcpMin:"0", ppOnly:false, rsLineHi:false,
     maxEarn:"0",
     sortBy:"setup_score", sortDir:"desc",
-    limit:"",
+    limit:"",           // blank = all matching rows (no limit)
   });
   const setF = (k,v) => setFilterS(p=>({...p,[k]:v}));
 
@@ -329,7 +342,7 @@ export default function IntelligenceTab() {
           maxEarn:   filterS.maxEarn   || 0,
           sortBy:    filterS.sortBy    || "setup_score",
           sortDir:   filterS.sortDir   || "desc",
-          limit:     filterS.limit     || 9999,
+          limit:     filterS.limit     || 9999,  // blank/empty = all
         });
         const d = await apiFetch(`/api/analytics/setup?${p}`);
         setSetups(d.results || []);
@@ -349,6 +362,7 @@ export default function IntelligenceTab() {
   useEffect(() => {
     load("internals");
     load("status");
+    // Load sector list on mount
     apiFetch("/api/analytics/sectors-list")
       .then(d => setSectorsList(d.sectors || []))
       .catch(() => {});
@@ -357,6 +371,7 @@ export default function IntelligenceTab() {
   useEffect(() => { if (tab==="setups")   load("setups");   }, [tab, filterS]);
   useEffect(() => { if (tab==="earnings") load("earnings"); }, [tab]);
 
+  // When sector filter changes, reload industry list for that sector
   useEffect(() => {
     const sec = (filterS.sectors||[])[0] || "";
     apiFetch(`/api/analytics/industries-list${sec?"?sector="+encodeURIComponent(sec):""}`)
@@ -364,6 +379,7 @@ export default function IntelligenceTab() {
       .catch(() => {});
   }, [filterS.sectors]);
 
+  // EMA cross fetch
   const runEmaCross = useCallback(async () => {
     setEmaCrossLoading(true);
     try {
@@ -380,7 +396,9 @@ export default function IntelligenceTab() {
       });
       const d = await apiFetch(`/api/analytics/ema-cross?${p}`);
       if (d.computing) {
+        // Touch data not ready — show computing state
         setEmaCrossResults({ _computing: true, _message: d.message });
+        // Auto-retry after 30s
         setTimeout(() => runEmaCross(), 30_000);
       } else {
         setEmaCrossResults(d.results || []);
@@ -389,6 +407,7 @@ export default function IntelligenceTab() {
     setEmaCrossLoading(false);
   }, [emaCrossF]);
 
+  // Validate fetch
   const runValidate = useCallback(async () => {
     setValidateLoading(true);
     try {
@@ -416,6 +435,7 @@ export default function IntelligenceTab() {
     setSymLoading(false);
   }, []);
 
+  // Export setups to Excel-compatible CSV (opens in Excel natively)
   const exportToExcel = useCallback((rows) => {
     const fmtNum = (v, dec=2) => v==null ? "" : (+v).toFixed(dec);
     const fmtPct = (v) => v==null ? "" : ((+v)>=0?"+":"")+fmtNum(v,1)+"%";
@@ -478,7 +498,9 @@ export default function IntelligenceTab() {
     document.body.removeChild(a); URL.revokeObjectURL(url);
   }, []);
 
-  const sortedSetups = setups;
+  // Server returns pre-sorted results. Column header clicks update filterS.sortBy
+  // and trigger a re-fetch — no client-side sort needed.
+  const sortedSetups = setups;   // already sorted by server
 
   const th = (k, label) => {
     if (!k) return <span style={{fontFamily:"monospace",fontSize:8,color:T.textGhost}}>{label}</span>;
@@ -496,10 +518,6 @@ export default function IntelligenceTab() {
       </div>
     );
   };
-
-  // ── JSX (the rest is identical to original) ─────────────────────────────────
-  // (To avoid duplication, the following JSX is exactly the same as in your original file,
-  // starting from the `<div>` after the sub-tab bar. I have included it in full below.)
 
   return (
     <div>
@@ -716,12 +734,14 @@ export default function IntelligenceTab() {
 
             {/* ── Sector Breadth table ──────────────────────────────────── */}
             {intern.sectors?.length>0&&(()=>{
+              // Period selector state — shared for both sector and industry tables
               const PERIODS = [
                 {k:"avg1d", l:"1D"},  {k:"avg1w", l:"1W"},  {k:"avg1m",  l:"1M"},
                 {k:"avg3m", l:"3M"},  {k:"avg6m", l:"6M"},  {k:"avgYtd", l:"YTD"},
                 {k:"avg1y", l:"1Y"},
               ];
               return(<>
+              {/* ── Shared period selector ─────────────────────────────────── */}
               <div style={{display:"flex",gap:6,alignItems:"center",marginBottom:10,flexWrap:"wrap"}}>
                 <span style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,
                   letterSpacing:".12em",marginRight:4}}>PERIOD:</span>
@@ -743,6 +763,7 @@ export default function IntelligenceTab() {
                 </span>
               </div>
 
+              {/* ── SECTOR BREADTH ─────────────────────────────────────────── */}
               <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,
                 padding:"14px 16px",marginBottom:10}}>
                 <div style={{fontFamily:"monospace",fontSize:9,color:T.textFaint,letterSpacing:".12em",
@@ -752,6 +773,7 @@ export default function IntelligenceTab() {
                     % above EMA200 · EMA50 · Stage2 · Avg {PERIODS.find(p=>p.k===breadthPeriod)?.l} return · Avg RS
                   </span>
                 </div>
+                {/* Header */}
                 <div style={{display:"grid",
                   gridTemplateColumns:"170px 72px 66px 66px 80px 64px",
                   gap:4,padding:"5px 4px",borderBottom:`2px solid ${T.border}`,
@@ -765,6 +787,7 @@ export default function IntelligenceTab() {
                   </span>
                   <span style={{textAlign:"center"}}>AVG RS</span>
                 </div>
+                {/* Rows — sorted by selected period return */}
                 {[...intern.sectors].sort((a,b)=>(b[breadthPeriod]??-999)-(a[breadthPeriod]??-999)).map(s=>{
                   const c200 = s.pctAbove200>=60?T.accent:s.pctAbove200>=40?"#ffe040":T.down;
                   const retVal = s[breadthPeriod];
@@ -783,6 +806,7 @@ export default function IntelligenceTab() {
                           {s.total} stocks
                         </span>
                       </div>
+                      {/* ABV200 with bar */}
                       <div style={{textAlign:"center"}}>
                         <span style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color:c200}}>
                           {s.pctAbove200}%
@@ -799,6 +823,7 @@ export default function IntelligenceTab() {
                         color:s.pctStage2>=30?T.accent:T.textDim}}>
                         {s.pctStage2}%
                       </span>
+                      {/* Selected period return — highlighted */}
                       <div style={{textAlign:"center",background:"rgba(167,139,250,.05)",
                         borderRadius:3,padding:"2px 4px"}}>
                         <span style={{fontFamily:"monospace",fontSize:10,fontWeight:700,color:retC}}>
@@ -814,6 +839,7 @@ export default function IntelligenceTab() {
                 })}
               </div>
 
+              {/* ── INDUSTRY BREADTH ───────────────────────────────────────── */}
               {intern.industries?.length>0&&(
                 <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,
                   padding:"14px 16px"}}>
@@ -840,6 +866,7 @@ export default function IntelligenceTab() {
                       </select>
                     </div>
                   </div>
+                  {/* Header */}
                   <div style={{display:"grid",
                     gridTemplateColumns:"200px 120px 72px 66px 66px 80px 64px",
                     gap:4,padding:"5px 4px",borderBottom:`2px solid ${T.border}`,
@@ -854,6 +881,7 @@ export default function IntelligenceTab() {
                     </span>
                     <span style={{textAlign:"center"}}>AVG RS</span>
                   </div>
+                  {/* Industry rows — filtered + sorted by selected period */}
                   {[...intern.industries]
                     .filter(ind=>!breadthSectorFilter||ind.sector===breadthSectorFilter)
                     .sort((a,b)=>(b[breadthPeriod]??-999)-(a[breadthPeriod]??-999))
@@ -910,6 +938,7 @@ export default function IntelligenceTab() {
                       );
                     })
                   }
+                  {/* Show more button */}
                   {!breadthShowAll&&(
                     (intern.industries.filter(i=>!breadthSectorFilter||i.sector===breadthSectorFilter).length>30)
                   )&&(
@@ -934,55 +963,63 @@ export default function IntelligenceTab() {
       {/* ══ TOP SETUPS TAB ══════════════════════════════════════════════════ */}
       {tab==="setups"&&(
         <div>
+          {/* ── Filter panel ──────────────────────────────────────────────── */}
           <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,
             padding:"12px 14px",marginBottom:12}}>
+
+            {/* Row 1: Score + RS + Price/Vol */}
             <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end",marginBottom:10}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:"#a78bfa88",
                 minWidth:60,alignSelf:"center",letterSpacing:".1em"}}>SCORE</span>
+              {/* Setup Score range */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Min Setup Score</span>
-                <input value={filterS.minScore} onChange={e=>setF("minScore",e.target.value)}
+                <input name="filterS_minScore" value={filterS.minScore} onChange={e=>setF("minScore",e.target.value)}
                   style={{width:50,background:T.inputBg,border:"1px solid #00e87a22",borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.accent,outline:"none"}}/>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Max Setup Score</span>
-                <input value={filterS.maxScore} onChange={e=>setF("maxScore",e.target.value)}
+                <input name="filterS_maxScore" value={filterS.maxScore} onChange={e=>setF("maxScore",e.target.value)}
                   style={{width:50,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
               </div>
+              {/* RS Rank range */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Min RS Rank</span>
-                <input value={filterS.minRS} onChange={e=>setF("minRS",e.target.value)}
+                <input name="filterS_minRS" value={filterS.minRS} onChange={e=>setF("minRS",e.target.value)}
                   style={{width:50,background:T.inputBg,border:"1px solid #a78bfa22",borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:"#a78bfa",outline:"none"}}/>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Max RS Rank</span>
-                <input value={filterS.maxRS} onChange={e=>setF("maxRS",e.target.value)}
+                <input name="filterS_maxRS" value={filterS.maxRS} onChange={e=>setF("maxRS",e.target.value)}
                   style={{width:50,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
               </div>
+              {/* Price */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Min Price $</span>
-                <input value={filterS.minPrice} onChange={e=>setF("minPrice",e.target.value)}
+                <input name="filterS_minPrice" value={filterS.minPrice} onChange={e=>setF("minPrice",e.target.value)}
                   style={{width:52,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Max Price $</span>
-                <input value={filterS.maxPrice} onChange={e=>setF("maxPrice",e.target.value)}
+                <input name="filterS_maxPrice" value={filterS.maxPrice} onChange={e=>setF("maxPrice",e.target.value)}
                   placeholder="∞"
                   style={{width:52,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
               </div>
+              {/* Share Volume */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Min Share Vol</span>
-                <input value={filterS.minVol} onChange={e=>setF("minVol",e.target.value)}
+                <input name="filterS_minVol" value={filterS.minVol} onChange={e=>setF("minVol",e.target.value)}
                   placeholder="100000"
                   style={{width:88,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
               </div>
+              {/* Dollar Volume */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:"#00d4ff88"}}>
                   Min $ Volume <span style={{color:T.textFaint}}>(price×vol)</span>
@@ -1000,6 +1037,7 @@ export default function IntelligenceTab() {
                   <option value="100000000">$100M+</option>
                 </select>
               </div>
+              {/* Results limit */}
               <div style={{display:"flex",flexDirection:"column",gap:3,minWidth:100}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>
                   Max Results
@@ -1027,10 +1065,12 @@ export default function IntelligenceTab() {
               </div>
             </div>
 
+            {/* Row 2: Stage + EMA + Sector + VCP */}
             <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end",marginBottom:10,
               paddingTop:8,borderTop:`1px solid ${T.border}`}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:"#a78bfa88",
                 minWidth:60,alignSelf:"center",letterSpacing:".1em"}}>TECHNICAL</span>
+              {/* Stage */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Stage</span>
                 <select value={filterS.stage} onChange={e=>setF("stage",e.target.value)}
@@ -1043,6 +1083,7 @@ export default function IntelligenceTab() {
                   <option value="4">Stage 4 — Decline</option>
                 </select>
               </div>
+              {/* EMA */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>EMA Position</span>
                 <select value={filterS.emaFilter} onChange={e=>setF("emaFilter",e.target.value)}
@@ -1054,6 +1095,7 @@ export default function IntelligenceTab() {
                   <option value="above_both">Above EMA50 + EMA200</option>
                 </select>
               </div>
+              {/* Sector — loaded from DB */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>
                   Sector {sectorsList.length>0&&<span style={{color:T.textFaint}}>({sectorsList.length})</span>}
@@ -1061,7 +1103,7 @@ export default function IntelligenceTab() {
                 <select value={filterS.sectors[0]||""}
                   onChange={e=>{
                     setF("sectors", e.target.value ? [e.target.value] : []);
-                    setF("industries", []);
+                    setF("industries", []);  // reset industry when sector changes
                   }}
                   style={{background:T.bg,border:`1px solid ${T.border2}`,color:T.text,
                     fontFamily:"monospace",fontSize:9,padding:"5px 7px",borderRadius:3,minWidth:170}}>
@@ -1071,6 +1113,7 @@ export default function IntelligenceTab() {
                   ))}
                 </select>
               </div>
+              {/* Industry — filtered by selected sector */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>
                   Industry {industriesList.length>0&&<span style={{color:T.textFaint}}>({industriesList.length})</span>}
@@ -1085,26 +1128,30 @@ export default function IntelligenceTab() {
                   ))}
                 </select>
               </div>
+              {/* Min VCP */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Min VCP Score</span>
-                <input value={filterS.vcpMin} onChange={e=>setF("vcpMin",e.target.value)}
+                <input name="filterS_vcpMin" value={filterS.vcpMin} onChange={e=>setF("vcpMin",e.target.value)}
                   placeholder="0"
                   style={{width:52,background:T.inputBg,border:"1px solid #00d4ff22",borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:"#00d4ff",outline:"none"}}/>
               </div>
+              {/* Exclude earnings */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Excl earnings ≤ N days</span>
-                <input value={filterS.maxEarn} onChange={e=>setF("maxEarn",e.target.value)}
+                <input name="filterS_maxEarn" value={filterS.maxEarn} onChange={e=>setF("maxEarn",e.target.value)}
                   placeholder="0 = off"
                   style={{width:68,background:T.inputBg,border:"1px solid #ff9f1c22",borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:"#ff9f1c",outline:"none"}}/>
               </div>
             </div>
 
+            {/* Row 3: Checkboxes + Sort + Apply */}
             <div style={{display:"flex",gap:14,flexWrap:"wrap",alignItems:"center",
               paddingTop:8,borderTop:`1px solid ${T.border}`}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:"#a78bfa88",
                 minWidth:60,letterSpacing:".1em"}}>FLAGS</span>
+              {/* Checkboxes */}
               {[
                 ["ppOnly",  "Pocket Pivot only",    "#00d4ff"],
                 ["rsLineHi","RS Line at 52W High",  "#a78bfa"],
@@ -1116,6 +1163,7 @@ export default function IntelligenceTab() {
                   <span style={{fontFamily:"monospace",fontSize:8,color:c}}>{label}</span>
                 </label>
               ))}
+              {/* Sort by */}
               <div style={{display:"flex",flexDirection:"column",gap:2,marginLeft:"auto"}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Sort By</span>
                 <select value={filterS.sortBy} onChange={e=>setF("sortBy",e.target.value)}
@@ -1150,6 +1198,7 @@ export default function IntelligenceTab() {
                   ))}
                 </div>
               </div>
+              {/* Apply */}
               <button onClick={()=>load("setups")}
                 style={{fontFamily:"monospace",fontSize:10,fontWeight:700,
                   padding:"7px 20px",borderRadius:4,border:"none",cursor:"pointer",
@@ -1157,6 +1206,7 @@ export default function IntelligenceTab() {
                   outline:"1px solid rgba(167,139,250,.5)"}}>
                 ▶ APPLY
               </button>
+              {/* Export to Excel */}
               {sortedSetups.length>0&&(
                 <button onClick={()=>exportToExcel(sortedSetups)}
                   style={{fontFamily:"monospace",fontSize:10,fontWeight:700,
@@ -1166,6 +1216,7 @@ export default function IntelligenceTab() {
                   ⬇ EXCEL
                 </button>
               )}
+              {/* Quick presets */}
               {[
                 {l:"Stage 2 Leaders", f:{stage:"2",minRS:"80",minScore:"60",emaFilter:"above_both",ppOnly:false,rsLineHi:false,sortBy:"setup_score"}},
                 {l:"RS 90+ Any Stage",f:{stage:"0",minRS:"90",minScore:"50",emaFilter:"any",ppOnly:false,rsLineHi:false,sortBy:"rs_rank"}},
@@ -1186,9 +1237,11 @@ export default function IntelligenceTab() {
             </div>
           </div>
 
+          {/* Table */}
           {sortedSetups.length>0 ? (
             <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,
               overflow:"hidden"}}>
+              {/* Result summary bar */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
                 padding:"6px 14px",background:T.row,borderBottom:`1px solid ${T.border}`}}>
                 <span style={{fontFamily:"monospace",fontSize:8,color:T.textDim}}>
@@ -1240,6 +1293,7 @@ export default function IntelligenceTab() {
                     overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.sector||"—"}</span>
                   <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim,
                     overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r.industry||"—"}</span>
+                  {/* Market Cap */}
                   <div style={{textAlign:"center"}}>
                     {(()=>{
                       const mc = r.market_cap;
@@ -1277,6 +1331,7 @@ export default function IntelligenceTab() {
                       </span>
                     ) : "—"}
                   </div>
+                  {/* $ Volume cell */}
                   <div style={{textAlign:"center"}}>
                     {(()=>{
                       const dv = r.dol_vol || (r.close * r.volume);
@@ -1405,6 +1460,7 @@ export default function IntelligenceTab() {
       {/* ══ SYMBOL SEARCH TAB ══════════════════════════════════════════════ */}
       {tab==="symbol"&&(
         <div>
+          {/* Search bar */}
           <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:16,
             background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,padding:"12px 16px"}}>
             <div style={{fontFamily:"monospace",fontSize:9,color:T.textFaint,
@@ -1437,6 +1493,7 @@ export default function IntelligenceTab() {
             )}
           </div>
 
+          {/* Result panel */}
           {symResult&&(()=>{
             const r   = symResult.data || {};
             const ctx = symResult.context || {};
@@ -1446,6 +1503,7 @@ export default function IntelligenceTab() {
             const pct2= v => v==null?"—":(v>=0?"+":"")+v.toFixed(2)+"%";
             const fmt2= v => v==null?"—":("$"+v.toFixed(2));
 
+            // Stage config
             const stageMap = {
               1:{c:"#ffe040",lbl:"STAGE 1 — BASING",  desc:"Accumulation phase. Waiting for breakout."},
               2:{c:T.accent,lbl:"STAGE 2 — UPTREND", desc:"Ideal trend. Price above rising MAs."},
@@ -1454,9 +1512,11 @@ export default function IntelligenceTab() {
             };
             const stage = stageMap[r.stage] || null;
 
+            // RS rank color
             const rsC = r.rs_rank>=90?T.accent:r.rs_rank>=80?T.accent:r.rs_rank>=70?"#ffe040":r.rs_rank>=50?"#ff9f1c":T.down;
             const scC = r.setup_score>=80?T.accent:r.setup_score>=60?T.accent:r.setup_score>=40?"#ffe040":"#ff9f1c";
 
+            // Mini sparkline from bars
             const closes = bars.map(b=>b.close).filter(Boolean);
             const spMin  = Math.min(...closes);
             const spMax  = Math.max(...closes);
@@ -1465,13 +1525,15 @@ export default function IntelligenceTab() {
 
             return (
               <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
+
+                {/* ── Left: Identity + Price ── */}
                 <div style={{background:T.surface,border:`1px solid ${T.border}`,
                   borderRadius:6,padding:"16px 18px"}}>
                   <div style={{display:"flex",justifyContent:"space-between",
                     alignItems:"flex-start",marginBottom:12}}>
                     <div>
                       <div style={{fontFamily:"monospace",fontSize:28,fontWeight:700,
-                        color:"#fff",lineHeight:1}}>{symResult.symbol}</div>
+                        color:T.text,fontWeight:800,lineHeight:1}}>{symResult.symbol}</div>
                       <div style={{fontFamily:"monospace",fontSize:11,color:T.textDim,
                         marginTop:4}}>{r.name||"—"}</div>
                       <div style={{display:"flex",gap:6,marginTop:6,flexWrap:"wrap"}}>
@@ -1490,6 +1552,8 @@ export default function IntelligenceTab() {
                         color:gc2(r.d1||0),marginTop:2}}>{pct2(r.d1)}</div>
                     </div>
                   </div>
+
+                  {/* Sparkline */}
                   {closes.length>2&&(
                     <div style={{background:T.row,borderRadius:3,padding:"6px 4px",
                       marginBottom:12}}>
@@ -1509,6 +1573,8 @@ export default function IntelligenceTab() {
                       </div>
                     </div>
                   )}
+
+                  {/* Price stats grid */}
                   {[
                     ["52W High",    r.hi52   ? "$"+r.hi52.toFixed(2)   : "—"],
                     ["52W Low",     r.lo52   ? "$"+r.lo52.toFixed(2)   : "—"],
@@ -1527,6 +1593,8 @@ export default function IntelligenceTab() {
                         fontWeight:500}}>{v}</span>
                     </div>
                   ))}
+
+                  {/* EMA position badges */}
                   <div style={{display:"flex",gap:6,marginTop:8,flexWrap:"wrap"}}>
                     {[["Above EMA50",r.above_ema50],["Above EMA200",r.above_ema200]].map(([l,v])=>(
                       <span key={l} style={{fontFamily:"monospace",fontSize:8,fontWeight:600,
@@ -1539,7 +1607,10 @@ export default function IntelligenceTab() {
                   </div>
                 </div>
 
+                {/* ── Right: Analytics ── */}
                 <div style={{display:"flex",flexDirection:"column",gap:10}}>
+
+                  {/* Stage */}
                   {stage&&(
                     <div style={{background:T.surface,border:`1px solid ${stage.c}33`,
                       borderRadius:6,padding:"14px 16px"}}>
@@ -1552,6 +1623,8 @@ export default function IntelligenceTab() {
                       </div>
                     </div>
                   )}
+
+                  {/* RS Rank + Setup Score */}
                   <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                     <div style={{background:T.surface,border:`1px solid ${rsC}22`,
                       borderRadius:6,padding:"12px 14px",textAlign:"center"}}>
@@ -1582,6 +1655,8 @@ export default function IntelligenceTab() {
                       )}
                     </div>
                   </div>
+
+                  {/* Returns table */}
                   <div style={{background:T.surface,border:`1px solid ${T.border}`,
                     borderRadius:6,padding:"12px 14px"}}>
                     <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,
@@ -1606,6 +1681,8 @@ export default function IntelligenceTab() {
                       })}
                     </div>
                   </div>
+
+                  {/* Flags */}
                   <div style={{background:T.surface,border:`1px solid ${T.border}`,
                     borderRadius:6,padding:"12px 14px"}}>
                     <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,
@@ -1643,6 +1720,7 @@ export default function IntelligenceTab() {
                         </span>}
                       </div>
                     )}
+                    {/* RS vs ETF */}
                     {(r.rs_vs_sector!=null||r.rs_vs_industry!=null)&&(
                       <div style={{marginTop:8,display:"flex",gap:10}}>
                         {r.rs_vs_sector!=null&&(
@@ -1670,6 +1748,8 @@ export default function IntelligenceTab() {
                       </div>
                     )}
                   </div>
+
+                  {/* Use in Risk Calc button */}
                   <button onClick={()=>{ setRiskPf(r); setTab("risk"); }}
                     style={{fontFamily:"monospace",fontSize:10,fontWeight:700,
                       padding:"10px",borderRadius:5,border:"none",cursor:"pointer",
@@ -1682,6 +1762,7 @@ export default function IntelligenceTab() {
             );
           })()}
 
+          {/* Empty state */}
           {!symResult&&!symLoading&&!symErr&&(
             <div style={{fontFamily:"monospace",fontSize:10,color:T.textGhost,
               textAlign:"center",padding:60,
@@ -1695,9 +1776,14 @@ export default function IntelligenceTab() {
       {/* ══ EMA CROSS TAB ══════════════════════════════════════════════════ */}
       {tab==="emacross"&&(
         <div>
+          {/* Filter bar */}
           <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,
             padding:"12px 16px",marginBottom:12}}>
+
+            {/* Row 1: EMA toggles + Touch mode + Min touches */}
             <div style={{display:"flex",gap:10,flexWrap:"wrap",alignItems:"flex-end",marginBottom:10}}>
+
+              {/* EMA Period multi-select (Pine: ema10_en ... ema200_en) */}
               <div style={{display:"flex",flexDirection:"column",gap:4}}>
                 <div style={{display:"flex",alignItems:"center",gap:6}}>
                   <span style={{fontFamily:"monospace",fontSize:8,color:"#00e87a88",letterSpacing:".1em"}}>
@@ -1736,6 +1822,8 @@ export default function IntelligenceTab() {
                   </div>
                 )}
               </div>
+
+              {/* Touch mode (Pine: touchMode input) */}
               <div style={{display:"flex",flexDirection:"column",gap:3}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Touch Condition</span>
                 <div style={{display:"flex",background:T.inputBg,border:`1px solid ${T.border}`,
@@ -1754,6 +1842,8 @@ export default function IntelligenceTab() {
                   ))}
                 </div>
               </div>
+
+              {/* Min touches (Pine: minTouches — only shown in "min" mode) */}
               {emaCrossF.touchMode==="min"&&(
                 <div style={{display:"flex",flexDirection:"column",gap:3}}>
                   <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>
@@ -1783,15 +1873,18 @@ export default function IntelligenceTab() {
                   </span>
                 </div>
               )}
+
+              {/* Filters: price, vol, sector, industry */}
               {[["Min $","minPrice","5",52],["Min Vol","minVol","100000",90]].map(([lbl,k,ph,w])=>(
                 <div key={k} style={{display:"flex",flexDirection:"column",gap:2}}>
                   <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>{lbl}</span>
-                  <input value={emaCrossF[k]} onChange={e=>setEmaCrossF(p=>({...p,[k]:e.target.value}))}
+                  <input name="emaCrossF_k" value={emaCrossF[k]} onChange={e=>setEmaCrossF(p=>({...p,[k]:e.target.value}))}
                     placeholder={ph}
                     style={{width:w,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                       padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
                 </div>
               ))}
+
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Sector</span>
                 <select value={(emaCrossF.sectors||[])[0]||""}
@@ -1802,6 +1895,7 @@ export default function IntelligenceTab() {
                   {sectorsList.map(s=><option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
+
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Industry</span>
                 <select value={(emaCrossF.industries||[])[0]||""}
@@ -1812,6 +1906,7 @@ export default function IntelligenceTab() {
                   {industriesList.map(i=><option key={i} value={i}>{i}</option>)}
                 </select>
               </div>
+
               <button onClick={runEmaCross}
                 style={{fontFamily:"monospace",fontSize:10,fontWeight:700,
                   padding:"7px 20px",borderRadius:4,border:"none",cursor:"pointer",
@@ -1820,6 +1915,8 @@ export default function IntelligenceTab() {
                 ▶ SCAN
               </button>
             </div>
+
+            {/* Info banner */}
             <div style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,lineHeight:1.8}}>
               <strong style={{color:T.accent}}>Touch</strong> = candle low ≤ EMA ≤ candle high (exact Pine Script logic). &nbsp;
               Signal strength: <span style={{color:"#ffe040"}}>●2</span> <span style={{color:"#ff9f1c"}}>●3</span> <span style={{color:T.down}}>●4</span> <span style={{color:"#a78bfa"}}>●5</span> &nbsp;
@@ -1831,24 +1928,27 @@ export default function IntelligenceTab() {
             <div style={{fontFamily:"monospace",fontSize:10,color:T.textFaint,
               textAlign:"center",padding:32}}>Scanning…</div>
           )}
+          {/* EMA touch data computing */}
           {!emaCrossLoading&&emaCrossResults._computing&&(
             <div style={{background:"rgba(255,224,64,.07)",border:"1px solid rgba(255,224,64,.25)",
               borderRadius:6,padding:"14px 18px",marginBottom:10}}>
               <div style={{fontFamily:"monospace",fontSize:9,color:"#ffe040",fontWeight:700,marginBottom:4}}>
                 ⚙ Computing EMA touch data in background…
               </div>
-              <div style={{fontFamily:"monospace",fontSize:8,color:"#7a6a20"}}>
+              <div style={{fontFamily:"monospace",fontSize:8,color:T.warn}}>
                 {emaCrossResults._message}
               </div>
-              <div style={{fontFamily:"monospace",fontSize:8,color:"#7a6a20",marginTop:4}}>
+              <div style={{fontFamily:"monospace",fontSize:8,color:T.warn,marginTop:4}}>
                 Or run manually: <span style={{color:"#ffe040"}}>npm run compute:ema</span>
                 {" "}(takes ~3 min for 6500 stocks)
               </div>
             </div>
           )}
 
+          {/* Results table */}
           {!emaCrossLoading&&Array.isArray(emaCrossResults)&&emaCrossResults.length>0&&(
             <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,overflow:"hidden"}}>
+              {/* Header */}
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",
                 padding:"6px 14px",background:T.row,borderBottom:`1px solid ${T.border}`}}>
                 <span style={{fontFamily:"monospace",fontSize:8,color:T.textDim}}>
@@ -1862,6 +1962,7 @@ export default function IntelligenceTab() {
                     : `≥${emaCrossF.minTouches||1} EMA${+emaCrossF.minTouches!==1?"s":""} touched`}
                   {" — "}sorted by touch count then RS Rank
                 </span>
+                {/* Export EMA cross results */}
                 <button onClick={()=>exportToExcel(emaCrossResults)}
                   style={{fontFamily:"monospace",fontSize:8,padding:"3px 10px",borderRadius:3,
                     border:"none",cursor:"pointer",background:"rgba(0,232,122,.1)",color:T.accent,
@@ -1905,6 +2006,7 @@ export default function IntelligenceTab() {
                 );
               })()}
               {(Array.isArray(emaCrossResults)?[...emaCrossResults]:[]).sort((a,b)=>{
+                // Special key: abs distance
                 const getVal = (row) => {
                   if (emaCrossSort.k === "cross_dist_pct_abs") {
                     const d = row.cross_dist_pct ?? row.ema_dist_pct;
@@ -1914,13 +2016,15 @@ export default function IntelligenceTab() {
                 };
                 return emaCrossSort.d * (getVal(a) - getVal(b));
               }).map((r,i)=>{
+                // cross_dist_pct: % distance of close from EMA (+ve = above, -ve = below)
                 const dp  = r.cross_dist_pct != null ? r.cross_dist_pct : null;
+                // Color: how far close is from EMA (absolute %)
                 const distC = dp==null ? T.textFaint
-                  : Math.abs(dp)<1   ? T.accent
-                  : Math.abs(dp)<3   ? T.accent
-                  : Math.abs(dp)<8   ? "#ffe040"
-                  : Math.abs(dp)<15  ? "#ff9f1c"
-                  : T.down;
+                  : Math.abs(dp)<1   ? T.accent    // ≤1% = green (very tight)
+                  : Math.abs(dp)<3   ? T.accent    // 1-3% = teal
+                  : Math.abs(dp)<8   ? "#ffe040"    // 3-8% = yellow (recent touch)
+                  : Math.abs(dp)<15  ? "#ff9f1c"    // 8-15% = orange
+                  : T.down;                       // >15% = red (too far, stale data)
                 const dv = r.dol_vol||(r.close*r.volume);
                 const dvFmt = dv>=1e9?(dv/1e9).toFixed(1)+"B":dv>=1e6?(dv/1e6).toFixed(1)+"M":dv>=1e3?(dv/1e3).toFixed(0)+"K":"—";
                 return(
@@ -1944,6 +2048,7 @@ export default function IntelligenceTab() {
                       <div style={{fontFamily:"monospace",fontSize:11,color:T.text,fontWeight:600}}>
                         ${(r.close||0).toFixed(2)}
                       </div>
+                      {/* Show all matched EMA values */}
                       {r.ema_val>0&&(
                         <div style={{fontFamily:"monospace",fontSize:7,
                           color:r.cross_dist_pct>=0?"#00e87a55":"#ff456055"}}>
@@ -1956,6 +2061,7 @@ export default function IntelligenceTab() {
                         </div>
                       )}
                     </div>
+                    {/* EMA distance */}
                     <div style={{textAlign:"center"}}>
                       {dp!=null ? (<>
                         <span style={{fontFamily:"monospace",fontSize:11,fontWeight:700,color:distC}}>
@@ -1965,6 +2071,7 @@ export default function IntelligenceTab() {
                           color:dp>=0?"#00e87a66":"#ff456066"}}>
                           {dp>=0?"▲ above":"▼ below"} EMA{r.ema_period}
                         </div>
+                        {/* Show matched EMAs if multiple */}
                         {r.matched_emas?.length>1&&(
                           <div style={{fontFamily:"monospace",fontSize:6.5,color:T.textFaint,marginTop:1}}>
                             also: {r.matched_emas.filter(e=>e!==r.ema_period).map(e=>`EMA${e}`).join("+")}
@@ -1979,8 +2086,11 @@ export default function IntelligenceTab() {
                         </div>
                       )}
                     </div>
+                    {/* RS */}
                     <div style={{textAlign:"center"}}><RSBadge rank={r.rs_rank}/></div>
+                    {/* Stage */}
                     <div style={{textAlign:"center"}}><StageBadge stage={r.stage}/></div>
+                    {/* 3M% */}
                     <div style={{textAlign:"center"}}>
                       {r.d63!=null?(
                         <span style={{fontFamily:"monospace",fontSize:10,fontWeight:600,
@@ -1989,12 +2099,15 @@ export default function IntelligenceTab() {
                         </span>
                       ):"—"}
                     </div>
+                    {/* $ Vol */}
                     <div style={{textAlign:"center"}}>
                       <span style={{fontFamily:"monospace",fontSize:9,color:dv>=10e6?T.accent:dv>=1e6?"#ffe040":T.textDim}}>
                         ${dvFmt}
                       </span>
                     </div>
+                    {/* Flags — Pine strength color + touched EMAs */}
                     <div style={{display:"flex",flexDirection:"column",gap:2}}>
+                      {/* Strength badge: color matches Pine plotshape arrowColor */}
                       <div style={{display:"flex",alignItems:"center",gap:4}}>
                         <span style={{fontSize:14,color:r.strength_color||T.accent}}>▲</span>
                         <span style={{fontFamily:"monospace",fontSize:9,fontWeight:700,
@@ -2003,6 +2116,7 @@ export default function IntelligenceTab() {
                         </span>
                         <span style={{fontFamily:"monospace",fontSize:7,color:T.textFaint}}>touch{r.touch_count>1?"es":""}</span>
                       </div>
+                      {/* Which EMAs were touched */}
                       <div style={{display:"flex",gap:2,flexWrap:"wrap"}}>
                         {(r.touched_emas||[]).sort((a,b)=>a-b).map(e=>(
                           <span key={e} style={{fontFamily:"monospace",fontSize:7,fontWeight:700,
@@ -2054,6 +2168,7 @@ export default function IntelligenceTab() {
 
           {validateData&&(
             <div>
+              {/* Overall status */}
               <div style={{background:T.surface,border:`1px solid ${validateData.allGood?"#00e87a33":"#ff9f1c33"}`,
                 borderRadius:6,padding:"12px 16px",marginBottom:12,
                 display:"flex",gap:12,alignItems:"center"}}>
@@ -2070,6 +2185,7 @@ export default function IntelligenceTab() {
                 </div>
               </div>
 
+              {/* Check rows */}
               <div style={{background:T.surface,border:`1px solid ${T.border}`,borderRadius:6,overflow:"hidden"}}>
                 {validateData.checks?.map((c,i)=>{
                   const color = c.ok ? T.accent : c.pct>50 ? "#ff9f1c" : T.down;
@@ -2079,14 +2195,18 @@ export default function IntelligenceTab() {
                       padding:"10px 16px",gap:10,alignItems:"center",
                       borderBottom:i<validateData.checks.length-1?`1px solid ${T.border}`:"none",
                       background:i%2===0?T.surface:T.row}}>
+                      {/* Status icon */}
                       <span style={{fontSize:14}}>{c.ok?"✅":"❌"}</span>
+                      {/* Label */}
                       <span style={{fontFamily:"monospace",fontSize:9,color:T.text,fontWeight:600}}>
                         {c.label}
                       </span>
+                      {/* Count */}
                       <span style={{fontFamily:"monospace",fontSize:9,color:color,fontWeight:700,
                         textAlign:"right"}}>
                         {c.n?.toLocaleString()}
                       </span>
+                      {/* Progress bar */}
                       <div>
                         <div style={{height:4,background:T.textGhost2,borderRadius:2,overflow:"hidden"}}>
                           <div style={{width:`${Math.min(c.pct,100)}%`,height:"100%",
@@ -2096,6 +2216,7 @@ export default function IntelligenceTab() {
                           {c.pct}%
                         </div>
                       </div>
+                      {/* Fix command */}
                       {!c.ok&&c.cmd&&(
                         <div style={{background:"rgba(255,159,28,.07)",border:"1px solid rgba(255,159,28,.2)",
                           borderRadius:3,padding:"4px 8px"}}>
@@ -2114,6 +2235,7 @@ export default function IntelligenceTab() {
                 })}
               </div>
 
+              {/* Hint */}
               <div style={{marginTop:10,fontFamily:"monospace",fontSize:8,color:T.textFaint,lineHeight:1.8}}>
                 Run checks in order: bootstrap → enrich:sectors → compute:analytics → compute:earnings
               </div>
