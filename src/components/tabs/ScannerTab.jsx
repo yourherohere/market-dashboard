@@ -352,10 +352,10 @@ function MultiSelectDropdown({ label, options, selected, onChange, color, width=
 // ─── SCANNER TAB ──────────────────────────────────────────────────────────────
 
 const SCAN_MODES = [
-  {key:"gainers",  label:"TOP GAINERS",   icon:"▲",  color:T.accent, desc:"Biggest % movers today"},
+  {key:"gainers",  label:"TOP GAINERS",   icon:"▲",  color:"#3fb950", desc:"Biggest % movers today"},
   {key:"volume",   label:"VOL SURGE",     icon:"◉",  color:"#ff9f1c", desc:"Rel. vol vs 10D avg"},
   {key:"momentum", label:"RS LEADERS",   icon:"◈",  color:"#00d4ff", desc:"Composite momentum"},
-  {key:"losers",   label:"TOP LOSERS",   icon:"▼",  color:T.down, desc:"Biggest % declines"},
+  {key:"losers",   label:"TOP LOSERS",   icon:"▼",  color:"#f85149", desc:"Biggest % declines"},
   {key:"eod",      label:"EOD DATABASE", icon:"🗄",  color:"#a78bfa", desc:"Historical DB · 1W–2Y returns", manualOnly:true},
   {key:"shorted",  label:"MOST SHORTED", icon:"⚡",  color:"#ff6b9d", desc:"Highest short interest %", manualOnly:true},
   {key:"52wkhigh", label:"52W HIGHS",    icon:"🔝", color:"#ffe45e", desc:"Near 52-week highs",       manualOnly:true},
@@ -1428,14 +1428,14 @@ function ScannerTab() {
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Sector ETF</span>
               <MultiSelectDropdown label="Sector ETF"
-                options={["XLK","XLV","XLF","XLY","XLP","XLC","XLE","XLB","XLI","XLU","XLRE"].map(s=>s)}
+                options={[XLK","XLV","XLF","XLY","XLP","XLC","XLE","XLB","XLI","XLU","XLRE"].map(s=>s)}
                 selected={eodF.sectorEtfs} onChange={v=>setE("sectorEtfs",v)}
                 color="#a78bfa" width={180}/>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Industry ETF</span>
               <MultiSelectDropdown label="Industry ETF"
-                options={["SOXX","IGV","CLOU","FDN","CIBR","BOTZ","ESPO","IBB","XBI","IHI","PJP","XHS","KRE","KBE","KCE","KIE","XRT","XHB","PEJ","XOP","OIH","AMLP","TAN","URA","GDX","GDXJ","SIL","XME","COPX","LIT","ITA","JETS","IYT","PAVE","VNQ","IYZ"].map(s=>s)}
+                options={[SOXX","IGV","CLOU","FDN","CIBR","BOTZ","ESPO","IBB","XBI","IHI","PJP","XHS","KRE","KBE","KCE","KIE","XRT","XHB","PEJ","XOP","OIH","AMLP","TAN","URA","GDX","GDXJ","SIL","XME","COPX","LIT","ITA","JETS","IYT","PAVE","VNQ","IYZ"].map(s=>s)}
                 selected={eodF.industryEtfs} onChange={v=>setE("industryEtfs",v)}
                 color="#00d4ff" width={200}/>
             </div>

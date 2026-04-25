@@ -268,7 +268,7 @@ export async function enrichSectorIndustryDB(options = {}) {
 export async function computeEtfRS() {
   log.step("Computing RS vs sector/industry ETFs…");
 
-  // Get all unique ETF symbols needed
+  // Get all unique ETF symbols needed — combine DB ETFs + all known GICS ETFs
   const etfRows = db.prepare(
     `SELECT DISTINCT sector_etf, industry_etf FROM eod_returns
      WHERE sector_etf IS NOT NULL OR industry_etf IS NOT NULL`
@@ -291,10 +291,40 @@ export async function computeEtfRS() {
     }
   }
 
-  // For ETFs not in DB, skip (user needs to add them to bootstrap)
+  // For ETFs not in DB — fetch live from Yahoo Finance and cache in eod_prices
   const missingEtfs = allEtfs.filter(e => !etfCloses[e]);
   if (missingEtfs.length) {
-    log.warn(`ETFs missing from DB (add to bootstrap): ${missingEtfs.slice(0,10).join(", ")}`);
+    log.warn(`ETFs missing from DB — fetching live: ${missingEtfs.join(", ")}`);
+    const yf = (await import("yahoo-finance2")).default;
+    const insertPrice = db.prepare(
+      `INSERT OR REPLACE INTO eod_prices (symbol, date, open, high, low, close, volume)
+       VALUES (@symbol,@date,@open,@high,@low,@close,@volume)`
+    );
+    const insertUniverse = db.prepare(
+      `INSERT OR IGNORE INTO universe (symbol, name, exchange, is_active)
+       VALUES (@symbol, @name, 'NYSE', 1)`
+    );
+    const batchInsert = db.transaction((rows) => { for (const r of rows) insertPrice.run(r); });
+
+    for (const etf of missingEtfs) {
+      try {
+        const from = new Date(Date.now() - 90 * 86400_000).toISOString().slice(0,10);
+        const result = await yf.historical(etf, { period1: from, interval: "1d" }).catch(()=>null);
+        if (!result?.length) { log.debug(`ETF ${etf}: no data`); continue; }
+        // Insert into universe so it's registered
+        insertUniverse.run({ symbol: etf, name: `${etf} ETF` });
+        const priceRows = result.map(r => ({
+          symbol: etf, date: r.date.toISOString().slice(0,10),
+          open: r.open||r.close, high: r.high||r.close,
+          low: r.low||r.close, close: r.close, volume: r.volume||0,
+        }));
+        batchInsert(priceRows);
+        etfCloses[etf] = priceRows.map(r => r.close);
+        log.ok(`  ${etf}: fetched ${priceRows.length} bars`);
+      } catch(e) {
+        log.debug(`ETF ${etf} fetch failed: ${e.message}`);
+      }
+    }
   }
 
   function calcRS63(closes, etfCloses63) {
