@@ -176,7 +176,7 @@ function RiskCalculator({ prefill={} }) {
       <div style={{display:"flex",alignItems:"center",gap:3,background:T.inputBg,
         border:`1px solid ${T.border2}`,borderRadius:3,padding:"5px 8px"}}>
         {prefix&&<span style={{fontFamily:"monospace",fontSize:10,color:T.textDim}}>{prefix}</span>}
-        <input name="value" value={value} onChange={e=>onChange(e.target.value)}
+        <input value={value} onChange={e=>onChange(e.target.value)}
           style={{width,background:"transparent",border:"none",outline:"none",
             fontFamily:"monospace",fontSize:11,color:T.text}}/>
         {suffix&&<span style={{fontFamily:"monospace",fontSize:10,color:T.textDim}}>{suffix}</span>}
@@ -974,39 +974,39 @@ export default function IntelligenceTab() {
               {/* Setup Score range */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Min Setup Score</span>
-                <input name="filterS_minScore" value={filterS.minScore} onChange={e=>setF("minScore",e.target.value)}
+                <input value={filterS.minScore} onChange={e=>setF("minScore",e.target.value)}
                   style={{width:50,background:T.inputBg,border:"1px solid #00e87a22",borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.accent,outline:"none"}}/>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Max Setup Score</span>
-                <input name="filterS_maxScore" value={filterS.maxScore} onChange={e=>setF("maxScore",e.target.value)}
+                <input value={filterS.maxScore} onChange={e=>setF("maxScore",e.target.value)}
                   style={{width:50,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
               </div>
               {/* RS Rank range */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Min RS Rank</span>
-                <input name="filterS_minRS" value={filterS.minRS} onChange={e=>setF("minRS",e.target.value)}
+                <input value={filterS.minRS} onChange={e=>setF("minRS",e.target.value)}
                   style={{width:50,background:T.inputBg,border:"1px solid #a78bfa22",borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:"#a78bfa",outline:"none"}}/>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Max RS Rank</span>
-                <input name="filterS_maxRS" value={filterS.maxRS} onChange={e=>setF("maxRS",e.target.value)}
+                <input value={filterS.maxRS} onChange={e=>setF("maxRS",e.target.value)}
                   style={{width:50,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
               </div>
               {/* Price */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Min Price $</span>
-                <input name="filterS_minPrice" value={filterS.minPrice} onChange={e=>setF("minPrice",e.target.value)}
+                <input value={filterS.minPrice} onChange={e=>setF("minPrice",e.target.value)}
                   style={{width:52,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
               </div>
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Max Price $</span>
-                <input name="filterS_maxPrice" value={filterS.maxPrice} onChange={e=>setF("maxPrice",e.target.value)}
+                <input value={filterS.maxPrice} onChange={e=>setF("maxPrice",e.target.value)}
                   placeholder="∞"
                   style={{width:52,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
@@ -1014,7 +1014,7 @@ export default function IntelligenceTab() {
               {/* Share Volume */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Min Share Vol</span>
-                <input name="filterS_minVol" value={filterS.minVol} onChange={e=>setF("minVol",e.target.value)}
+                <input value={filterS.minVol} onChange={e=>setF("minVol",e.target.value)}
                   placeholder="100000"
                   style={{width:88,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>
@@ -1131,7 +1131,7 @@ export default function IntelligenceTab() {
               {/* Min VCP */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Min VCP Score</span>
-                <input name="filterS_vcpMin" value={filterS.vcpMin} onChange={e=>setF("vcpMin",e.target.value)}
+                <input value={filterS.vcpMin} onChange={e=>setF("vcpMin",e.target.value)}
                   placeholder="0"
                   style={{width:52,background:T.inputBg,border:"1px solid #00d4ff22",borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:"#00d4ff",outline:"none"}}/>
@@ -1139,7 +1139,7 @@ export default function IntelligenceTab() {
               {/* Exclude earnings */}
               <div style={{display:"flex",flexDirection:"column",gap:2}}>
                 <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>Excl earnings ≤ N days</span>
-                <input name="filterS_maxEarn" value={filterS.maxEarn} onChange={e=>setF("maxEarn",e.target.value)}
+                <input value={filterS.maxEarn} onChange={e=>setF("maxEarn",e.target.value)}
                   placeholder="0 = off"
                   style={{width:68,background:T.inputBg,border:"1px solid #ff9f1c22",borderRadius:3,
                     padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:"#ff9f1c",outline:"none"}}/>
@@ -1878,7 +1878,7 @@ export default function IntelligenceTab() {
               {[["Min $","minPrice","5",52],["Min Vol","minVol","100000",90]].map(([lbl,k,ph,w])=>(
                 <div key={k} style={{display:"flex",flexDirection:"column",gap:2}}>
                   <span style={{fontFamily:"monospace",fontSize:7,color:T.textDim}}>{lbl}</span>
-                  <input name="emaCrossF_k" value={emaCrossF[k]} onChange={e=>setEmaCrossF(p=>({...p,[k]:e.target.value}))}
+                  <input value={emaCrossF[k]} onChange={e=>setEmaCrossF(p=>({...p,[k]:e.target.value}))}
                     placeholder={ph}
                     style={{width:w,background:T.inputBg,border:`1px solid ${T.border}`,borderRadius:3,
                       padding:"4px 6px",fontFamily:"monospace",fontSize:10,color:T.text,outline:"none"}}/>

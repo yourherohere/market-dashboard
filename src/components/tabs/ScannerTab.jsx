@@ -855,7 +855,7 @@ function ScannerTab() {
   const IN=(label,key,width,placeholder="")=>(
     <div style={{display:"flex",flexDirection:"column",gap:3}}>
       <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim,letterSpacing:".06em"}}>{label}</span>
-      <input name="cf_key" value={cf[key]} onChange={e=>setC(key,e.target.value)} placeholder={placeholder}
+      <input value={cf[key]} onChange={e=>setC(key,e.target.value)} placeholder={placeholder}
         style={{width,background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:3,
           padding:"5px 7px",fontFamily:"monospace",fontSize:11,color:T.text,outline:"none"}}/>
     </div>
@@ -917,7 +917,7 @@ function ScannerTab() {
           <div key={label} style={{display:"flex",alignItems:"center",gap:6,background:T.surface,
             border:`1px solid ${val?"#00e87a33":T.border}`,borderRadius:4,padding:"5px 10px"}}>
             <span style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,whiteSpace:"nowrap"}}>{label}</span>
-            <input name="val" value={val} onChange={e=>setter(e.target.value)} placeholder={ph}
+            <input value={val} onChange={e=>setter(e.target.value)} placeholder={ph}
               style={{width:130,background:"transparent",border:"none",outline:"none",fontFamily:"monospace",fontSize:10,color:T.text}}/>
             {val&&<span onClick={()=>setter("")} style={{cursor:"pointer",color:T.textDim,fontSize:12}}>×</span>}
           </div>
@@ -931,7 +931,7 @@ function ScannerTab() {
             border:`1px solid ${T.border2}`,borderRadius:4,padding:"5px 10px"}}>
             <span style={{fontFamily:"monospace",fontSize:9,color:T.textFaint,cursor:"pointer"}}
               onClick={()=>{if(symSearch.trim())addPinnedByText(symSearch);}}>🔍</span>
-            <input name="symSearch" value={symSearch}
+            <input value={symSearch}
               onChange={e=>setSymSearch(e.target.value.toUpperCase())}
               onKeyDown={e=>{ if(e.key==="Enter"&&symSearch.trim()){ addPinnedByText(symSearch); } }}
               placeholder="SYMBOL / COMPANY…"
@@ -1032,7 +1032,7 @@ function ScannerTab() {
             ].map(([label,k,w,ph])=>(
               <div key={k} style={{display:"flex",flexDirection:"column",gap:3}}>
                 <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim,letterSpacing:".06em"}}>{label}</span>
-                <input name="univFilters_k" value={univFilters[k]} onChange={e=>setUF(k,e.target.value)}
+                <input value={univFilters[k]} onChange={e=>setUF(k,e.target.value)}
                   placeholder={ph}
                   style={{width:w,background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:3,
                     padding:"5px 7px",fontFamily:"monospace",fontSize:11,color:T.text,outline:"none"}}/>
@@ -1108,7 +1108,7 @@ function ScannerTab() {
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Min Mcap</span>
               <div style={{display:"flex",gap:3}}>
-                <input name="cf_minMcap" value={cf.minMcap} onChange={e=>setC("minMcap",e.target.value)}
+                <input value={cf.minMcap} onChange={e=>setC("minMcap",e.target.value)}
                   style={{width:46,background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:3,padding:"5px 7px",fontFamily:"monospace",fontSize:11,color:T.text,outline:"none"}}/>
                 <select value={cf.mcUnit} onChange={e=>setC("mcUnit",e.target.value)}
                   style={{background:T.bg,border:`1px solid ${T.border2}`,color:T.text,fontFamily:"monospace",fontSize:10,padding:"4px 5px",borderRadius:3}}>
@@ -1149,10 +1149,10 @@ function ScannerTab() {
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>RSI Range</span>
               <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                <input name="cf_minRsi" value={cf.minRsi} onChange={e=>setC("minRsi",e.target.value)} placeholder="0"
+                <input value={cf.minRsi} onChange={e=>setC("minRsi",e.target.value)} placeholder="0"
                   style={{width:44,background:T.inputBg,border:"1px solid #00e87a18",borderRadius:3,padding:"5px 6px",fontFamily:"monospace",fontSize:11,color:T.accent,outline:"none"}}/>
                 <span style={{fontFamily:"monospace",fontSize:9,color:T.textFaint}}>–</span>
-                <input name="cf_maxRsi" value={cf.maxRsi} onChange={e=>setC("maxRsi",e.target.value)} placeholder="100"
+                <input value={cf.maxRsi} onChange={e=>setC("maxRsi",e.target.value)} placeholder="100"
                   style={{width:44,background:T.inputBg,border:"1px solid #00e87a18",borderRadius:3,padding:"5px 6px",fontFamily:"monospace",fontSize:11,color:T.accent,outline:"none"}}/>
               </div>
             </div>
@@ -1167,10 +1167,10 @@ function ScannerTab() {
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>ADR% Range</span>
               <div style={{display:"flex",gap:4,alignItems:"center"}}>
-                <input name="cf_minAdr" value={cf.minAdr} onChange={e=>setC("minAdr",e.target.value)} placeholder="0"
+                <input value={cf.minAdr} onChange={e=>setC("minAdr",e.target.value)} placeholder="0"
                   style={{width:44,background:T.inputBg,border:"1px solid #ffe04018",borderRadius:3,padding:"5px 6px",fontFamily:"monospace",fontSize:11,color:"#ffe040",outline:"none"}}/>
                 <span style={{fontFamily:"monospace",fontSize:9,color:T.textFaint}}>–</span>
-                <input name="cf_maxAdr" value={cf.maxAdr} onChange={e=>setC("maxAdr",e.target.value)} placeholder="∞"
+                <input value={cf.maxAdr} onChange={e=>setC("maxAdr",e.target.value)} placeholder="∞"
                   style={{width:44,background:T.inputBg,border:"1px solid #ffe04018",borderRadius:3,padding:"5px 6px",fontFamily:"monospace",fontSize:11,color:"#ffe040",outline:"none"}}/>
               </div>
             </div>
@@ -1184,7 +1184,7 @@ function ScannerTab() {
                     outline:cf.quietCandles==="1"?"1px solid #00e5ff44":`1px solid ${T.border}`}}>
                   {cf.quietCandles==="1"?"ON":"OFF"}
                 </button>
-                <input name="cf_quietPct" value={cf.quietPct} onChange={e=>setC("quietPct",e.target.value)}
+                <input value={cf.quietPct} onChange={e=>setC("quietPct",e.target.value)}
                   style={{width:36,background:T.inputBg,border:"1px solid #00e5ff18",borderRadius:3,padding:"5px 5px",fontFamily:"monospace",fontSize:11,color:"#00e5ff",outline:"none",textAlign:"center"}}/>
               </div>
             </div>
@@ -1359,7 +1359,7 @@ function ScannerTab() {
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:"#a78bfa"}}>Min Return %</span>
-              <input name="eodF_minPeriod" value={eodF.minPeriod} onChange={e=>setE("minPeriod",e.target.value)}
+              <input value={eodF.minPeriod} onChange={e=>setE("minPeriod",e.target.value)}
                 placeholder="e.g. 5"
                 style={{width:66,background:T.inputBg,border:"1px solid #a78bfa22",borderRadius:3,
                   padding:"5px 7px",fontFamily:"monospace",fontSize:11,color:"#a78bfa",outline:"none"}}/>
@@ -1367,11 +1367,11 @@ function ScannerTab() {
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Min $ · Max $</span>
               <div style={{display:"flex",gap:4}}>
-                <input name="eodF_minPrice" value={eodF.minPrice} onChange={e=>setE("minPrice",e.target.value)}
+                <input value={eodF.minPrice} onChange={e=>setE("minPrice",e.target.value)}
                   placeholder="5"
                   style={{width:50,background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:3,
                     padding:"5px 6px",fontFamily:"monospace",fontSize:11,color:T.text,outline:"none"}}/>
-                <input name="eodF_maxPrice" value={eodF.maxPrice||""} onChange={e=>setE("maxPrice",e.target.value)}
+                <input value={eodF.maxPrice||""} onChange={e=>setE("maxPrice",e.target.value)}
                   placeholder="∞"
                   style={{width:50,background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:3,
                     padding:"5px 6px",fontFamily:"monospace",fontSize:11,color:T.text,outline:"none"}}/>
@@ -1379,21 +1379,21 @@ function ScannerTab() {
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Min Vol / Avg Vol</span>
-              <input name="eodF_minVol" value={eodF.minVol} onChange={e=>setE("minVol",e.target.value)}
+              <input value={eodF.minVol} onChange={e=>setE("minVol",e.target.value)}
                 placeholder="100000"
                 style={{width:90,background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:3,
                   padding:"5px 7px",fontFamily:"monospace",fontSize:11,color:T.text,outline:"none"}}/>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:"#ff9f1c66"}}>Max Abs Return % <span style={{color:T.textFaint}}>(outlier cap)</span></span>
-              <input name="eodF_maxAbsReturn___500" value={eodF.maxAbsReturn||"500"} onChange={e=>setE("maxAbsReturn",e.target.value)}
+              <input value={eodF.maxAbsReturn||"500"} onChange={e=>setE("maxAbsReturn",e.target.value)}
                 placeholder="500"
                 style={{width:64,background:T.inputBg,border:"1px solid #ff9f1c18",borderRadius:3,
                   padding:"5px 7px",fontFamily:"monospace",fontSize:11,color:"#ff9f1c",outline:"none"}}/>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Limit</span>
-              <input name="eodF_limit" value={eodF.limit} onChange={e=>setE("limit",e.target.value)}
+              <input value={eodF.limit} onChange={e=>setE("limit",e.target.value)}
                 placeholder="200"
                 style={{width:56,background:T.inputBg,border:`1px solid ${T.border2}`,borderRadius:3,
                   padding:"5px 7px",fontFamily:"monospace",fontSize:11,color:T.text,outline:"none"}}/>
@@ -1428,27 +1428,27 @@ function ScannerTab() {
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Sector ETF</span>
               <MultiSelectDropdown label="Sector ETF"
-                options={[XLK","XLV","XLF","XLY","XLP","XLC","XLE","XLB","XLI","XLU","XLRE"].map(s=>s)}
+                options={["XLK","XLV","XLF","XLY","XLP","XLC","XLE","XLB","XLI","XLU","XLRE"].map(s=>s)}
                 selected={eodF.sectorEtfs} onChange={v=>setE("sectorEtfs",v)}
                 color="#a78bfa" width={180}/>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Industry ETF</span>
               <MultiSelectDropdown label="Industry ETF"
-                options={[SOXX","IGV","CLOU","FDN","CIBR","BOTZ","ESPO","IBB","XBI","IHI","PJP","XHS","KRE","KBE","KCE","KIE","XRT","XHB","PEJ","XOP","OIH","AMLP","TAN","URA","GDX","GDXJ","SIL","XME","COPX","LIT","ITA","JETS","IYT","PAVE","VNQ","IYZ"].map(s=>s)}
+                options={["SOXX","IGV","CLOU","FDN","CIBR","BOTZ","ESPO","IBB","XBI","IHI","PJP","XHS","KRE","KBE","KCE","KIE","XRT","XHB","PEJ","XOP","OIH","AMLP","TAN","URA","GDX","GDXJ","SIL","XME","COPX","LIT","ITA","JETS","IYT","PAVE","VNQ","IYZ"].map(s=>s)}
                 selected={eodF.industryEtfs} onChange={v=>setE("industryEtfs",v)}
                 color="#00d4ff" width={200}/>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Min RS vs Sector ETF</span>
-              <input name="eodF_minRsVsSector" value={eodF.minRsVsSector} onChange={e=>setE("minRsVsSector",e.target.value)}
+              <input value={eodF.minRsVsSector} onChange={e=>setE("minRsVsSector",e.target.value)}
                 placeholder="e.g. 5"
                 style={{width:72,background:T.inputBg,border:"1px solid #a78bfa22",borderRadius:3,
                   padding:"5px 7px",fontFamily:"monospace",fontSize:11,color:"#a78bfa",outline:"none"}}/>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Min RS vs Industry ETF</span>
-              <input name="eodF_minRsVsIndustry" value={eodF.minRsVsIndustry} onChange={e=>setE("minRsVsIndustry",e.target.value)}
+              <input value={eodF.minRsVsIndustry} onChange={e=>setE("minRsVsIndustry",e.target.value)}
                 placeholder="e.g. 5"
                 style={{width:72,background:T.inputBg,border:"1px solid #00d4ff22",borderRadius:3,
                   padding:"5px 7px",fontFamily:"monospace",fontSize:11,color:"#00d4ff",outline:"none"}}/>
