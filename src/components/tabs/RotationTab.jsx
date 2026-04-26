@@ -1,11 +1,10 @@
+// src/components/tabs/RotationTab.jsx
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTheme, THEME } from "../../hooks/useTheme.js";
 import { Spark, McapBadge, EmaBadge, PctCell, LoadingDots, ScoreDial } from "../common/index.jsx";
 import { pct, fmt, gc, fmtMcap, fmtVol, calcRet, calcRetSince, soM, soY, sparkPath } from "../../utils/format.js";
 import { GICS, ALL_ETF_SYMS, SECTOR_ETF_SYMS, SUB_ETF_SYMS, secCol, INDEX_SYMS } from "../../constants/gics.js";
 
-// API base: empty string = same origin (via Vite proxy in dev, same-origin in prod)
-// Override with VITE_API_BASE_URL env var for remote deployments
 const BASE = (typeof __API_BASE__ !== "undefined" && __API_BASE__) ? __API_BASE__ : "";
 async function apiFetch(path, opts={}) {
   const url = path.startsWith("http") ? path : BASE + path;
@@ -18,7 +17,7 @@ const heat = v => {
   if(v>=5)  return{bg:"rgba(0,232,122,.25)",fg:"var(--clr-up)"};
   if(v>=2)  return{bg:"rgba(0,232,122,.12)",fg:"var(--clr-up)"};
   if(v>=0)  return{bg:"rgba(0,232,122,.05)",fg:"#7ab89a"};
-  if(v>=-2) return{bg:"rgba(255,69,96,.05)",fg:"#d08080"};
+  if(v>=-2) return{bg:"rgba(255,69,96,.05)",fg:"var(--clr-dn)"};
   if(v>=-5) return{bg:"rgba(255,69,96,.12)",fg:"#ff6060"};
   return      {bg:"rgba(255,69,96,.25)",fg:"var(--clr-dn)"};
 };
@@ -66,8 +65,6 @@ function TVChartPopup({ symbol, onClose }) {
   const themeKey = useTheme();
   const T = THEME[themeKey] || THEME.night;
 
-  const W = Math.max(480, Math.floor(window.innerWidth * 0.50));
-
   function destroyChart() {
     if (chartRef.current) {
       try { chartRef.current.remove(); } catch(e) {}
@@ -91,8 +88,6 @@ function TVChartPopup({ symbol, onClose }) {
 
       const LC = window.LightweightCharts;
       const chartH = containerRef.current.clientHeight;
-      // Read current theme from body background to auto-detect day/night
-      // Use CSS variable values (read from :root after applyTheme has run)
       const rootStyle = getComputedStyle(document.documentElement);
       const cBg   = rootStyle.getPropertyValue("--chartBg").trim()   || T.chartBg;
       const cGrid = rootStyle.getPropertyValue("--chartGrid").trim() || T.chartGrid;
@@ -199,7 +194,6 @@ function TVChartPopup({ symbol, onClose }) {
       display:"flex", flexDirection:"column",
       animation:"tvFadeIn .18s ease",
     }}>
-      {/* Header */}
       <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
         padding:"10px 14px",background:T.header,borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
         <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
@@ -227,8 +221,6 @@ function TVChartPopup({ symbol, onClose }) {
             style={{cursor:"pointer",color:T.textDim,fontSize:20,lineHeight:1,padding:"2px 6px"}}>×</span>
         </div>
       </div>
-
-      {/* EMA legend */}
       <div style={{display:"flex",gap:14,padding:"5px 14px",background:T.surface2,
         borderBottom:`1px solid ${T.border}`,flexShrink:0,alignItems:"center"}}>
         {[["20 EMA","#00e5ff"],["50 EMA","#ffe040"],["200 EMA","#ff6b6b"],["Volume","rgba(0,232,122,0.3)"]].map(function(item) {
@@ -243,8 +235,6 @@ function TVChartPopup({ symbol, onClose }) {
           DAILY · scroll to zoom
         </span>
       </div>
-
-      {/* Chart */}
       <div ref={containerRef} style={{flex:1,minHeight:0,position:"relative",overflow:"hidden"}}>
         {loading&&(
           <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",
@@ -274,27 +264,11 @@ function TVChartPopup({ symbol, onClose }) {
   );
 }
 
-// ─── SECTOR → INDUSTRY MAP ────────────────────────────────────────────────────
-const SECTOR_INDUSTRY_MAP = {
-  "Technology": ["Semiconductors","Software—Application","Software—Infrastructure","Computer Hardware","Consumer Electronics","Electronic Components","Electronics & Computer Distribution","Information Technology Services","Scientific & Technical Instruments","Communication Equipment","Solar"],
-  "Healthcare": ["Biotechnology","Drug Manufacturers—General","Drug Manufacturers—Specialty & Generic","Medical Devices","Medical Instruments & Supplies","Health Information Services","Healthcare Plans","Medical Care Facilities","Diagnostics & Research","Medical Distribution","Pharmaceutical Retailers"],
-  "Financial Services": ["Banks—Regional","Banks—Diversified","Asset Management","Capital Markets","Insurance—Life","Insurance—Property & Casualty","Insurance—Diversified","Insurance Brokers","Financial Data & Stock Exchanges","Credit Services","Mortgage Finance","Shell Companies"],
-  "Consumer Cyclical": ["Retail—Apparel","Retail—Specialty","Auto Manufacturers","Auto Parts","Internet Retail","Luxury Goods","Residential Construction","Restaurants","Gambling","Hotels & Motels","Department Stores","Furnishings, Fixtures & Appliances","Home Improvement Retail","Footwear & Accessories","Personal Services","Recreational Vehicles","Travel Services"],
-  "Consumer Defensive": ["Grocery Stores","Beverages—Non-Alcoholic","Beverages—Brewers","Beverages—Wineries & Distilleries","Discount Stores","Drug Stores","Food Distribution","Packaged Foods","Tobacco","Household & Personal Products","Education & Training Services","Food Confectioners"],
-  "Communication Services": ["Telecom Services","Entertainment","Internet Content & Information","Broadcasting","Electronic Gaming & Multimedia","Advertising Agencies","Publishing"],
-  "Energy": ["Oil & Gas E&P","Oil & Gas Integrated","Oil & Gas Refining & Marketing","Oil & Gas Midstream","Oil & Gas Equipment & Services","Coal","Uranium"],
-  "Basic Materials": ["Specialty Chemicals","Agricultural Inputs","Chemicals","Gold","Silver","Copper","Steel","Aluminum","Building Materials","Coking Coal","Other Industrial Metals & Mining","Other Precious Metals & Mining","Paper & Paper Products","Lumber & Wood Production"],
-  "Industrials": ["Aerospace & Defense","Airlines","Airports & Air Services","Building Products & Equipment","Business Equipment & Supplies","Engineering & Construction","Farm & Construction Equipment","Industrial Distribution","Integrated Freight & Logistics","Marine Shipping","Metal Fabrication","Pollution & Treatment Controls","Railroads","Rental & Leasing Services","Security & Protection Services","Specialty Industrial Machinery","Staffing & Employment Services","Tools & Accessories","Trucking","Waste Management","Conglomerates"],
-  "Real Estate": ["REIT—Diversified","REIT—Healthcare Facilities","REIT—Hotel & Motel","REIT—Industrial","REIT—Mortgage","REIT—Office","REIT—Residential","REIT—Retail","REIT—Specialty","Real Estate Services","Real Estate—Development"],
-  "Utilities": ["Utilities—Diversified","Utilities—Independent Power Producers","Utilities—Regulated Electric","Utilities—Regulated Gas","Utilities—Regulated Water","Utilities—Renewable"],
-};
-const ALL_SECTORS = Object.keys(SECTOR_INDUSTRY_MAP);
-
 // ─── MULTI-SELECT DROPDOWN ────────────────────────────────────────────────────
-function MultiSelectDropdown({ label, options, selected, onChange, _color, width=200 }) {
+function MultiSelectDropdown({ label, options, selected, onChange, color, width=200 }) {
   const _tk2 = useTheme();
   const T2   = THEME[_tk2] || THEME.night;
-  const _color = _color || T2.accent;
+  const _color = color || T2.accent;
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
@@ -308,36 +282,36 @@ function MultiSelectDropdown({ label, options, selected, onChange, _color, width
   return (
     <div ref={ref} style={{position:"relative",display:"inline-block",userSelect:"none"}}>
       <div onClick={()=>setOpen(o=>!o)}
-        style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",background:T.inputBg,
-          border:`1px solid ${selCount>0?_color+"44":T.border2}`,borderRadius:4,padding:"6px 10px",
-          width,boxSizing:"border-box",boxShadow:selCount>0?`0 0 8px ${color}18`:"none"}}>
-        <span style={{fontFamily:"monospace",fontSize:9,color:selCount>0?color:T.textDim,flex:1,
+        style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",background:T2.inputBg,
+          border:`1px solid ${selCount>0?_color+"44":T2.border2}`,borderRadius:4,padding:"6px 10px",
+          width,boxSizing:"border-box",boxShadow:selCount>0?`0 0 8px ${_color}18`:"none"}}>
+        <span style={{fontFamily:"monospace",fontSize:9,color:selCount>0?_color:T2.textDim,flex:1,
           overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:".04em"}}>
           {selCount===0?`ALL ${label.toUpperCase()}S`:selCount===1?selected[0]:`${selCount} ${label}s`}
         </span>
-        {selCount>0&&<span onClick={clearAll} style={{color:T.textDim,fontSize:12,cursor:"pointer"}}>×</span>}
-        <span style={{color:T.textFaint,fontSize:9}}>{open?"▲":"▼"}</span>
+        {selCount>0&&<span onClick={clearAll} style={{color:T2.textDim,fontSize:12,cursor:"pointer"}}>×</span>}
+        <span style={{color:T2.textFaint,fontSize:9}}>{open?"▲":"▼"}</span>
       </div>
       {open&&(
-        <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:1000,background:T.bg,
-          border:`1px solid ${T.border2}`,borderRadius:5,width:Math.max(width,240),maxHeight:260,
+        <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:1000,background:T2.bg,
+          border:`1px solid ${T2.border2}`,borderRadius:5,width:Math.max(width,240),maxHeight:260,
           overflowY:"auto",boxShadow:"0 8px 32px rgba(0,0,0,.7)"}}>
           <div style={{padding:"6px 10px",borderBottom:"1px solid #0d1a26",display:"flex",gap:8}}>
-            <span onClick={()=>onChange(options)} style={{fontFamily:"monospace",fontSize:8,color,cursor:"pointer"}}>ALL</span>
-            <span style={{color:T.border2}}>|</span>
-            <span onClick={()=>onChange([])} style={{fontFamily:"monospace",fontSize:8,color:T.textDim,cursor:"pointer"}}>NONE</span>
+            <span onClick={()=>onChange(options)} style={{fontFamily:"monospace",fontSize:8,_color,cursor:"pointer"}}>ALL</span>
+            <span style={{color:T2.border2}}>|</span>
+            <span onClick={()=>onChange([])} style={{fontFamily:"monospace",fontSize:8,color:T2.textDim,cursor:"pointer"}}>NONE</span>
           </div>
           {options.map(opt=>(
             <div key={opt} onClick={()=>toggle(opt)}
               style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",cursor:"pointer",
-                background:selected.includes(opt)?`${color}0e`:"transparent",borderBottom:`1px solid ${T.border}`}}
-              onMouseEnter={e=>{ if(!selected.includes(opt)) e.currentTarget.style.background=T.border; }}
-              onMouseLeave={e=>{ e.currentTarget.style.background=selected.includes(opt)?`${color}0e`:"transparent"; }}>
-              <div style={{width:12,height:12,borderRadius:2,flexShrink:0,background:selected.includes(opt)?color:"transparent",
-                border:`1.5px solid ${selected.includes(opt)?color:T.border2}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+                background:selected.includes(opt)?`${_color}0e`:"transparent",borderBottom:`1px solid ${T2.border}`}}
+              onMouseEnter={e=>{ if(!selected.includes(opt)) e.currentTarget.style.background=T2.border; }}
+              onMouseLeave={e=>{ e.currentTarget.style.background=selected.includes(opt)?`${_color}0e`:"transparent"; }}>
+              <div style={{width:12,height:12,borderRadius:2,flexShrink:0,background:selected.includes(opt)?_color:"transparent",
+                border:`1.5px solid ${selected.includes(opt)?_color:T2.border2}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
                 {selected.includes(opt)&&<span style={{color:"#000",fontSize:9,fontWeight:900,lineHeight:1}}>✓</span>}
               </div>
-              <span style={{fontFamily:"monospace",fontSize:9,color:selected.includes(opt)?T.text:T.textDim,
+              <span style={{fontFamily:"monospace",fontSize:9,color:selected.includes(opt)?T2.text:T2.textDim,
                 overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{opt}</span>
             </div>
           ))}
@@ -347,26 +321,27 @@ function MultiSelectDropdown({ label, options, selected, onChange, _color, width
   );
 }
 
-// ─── SCANNER TAB ──────────────────────────────────────────────────────────────
-
-function RotationTab({ etfQuotes = {} }) {
+// ─── MAIN ROTATION TAB ────────────────────────────────────────────────────────
+export default function RotationTab({ etfQuotes = {} }) {
   const themeKey = useTheme();
   const T = THEME[themeKey] || THEME.night;
   const dark = themeKey === "night";
 
+  // ✅ ALL HOOKS MUST BE HERE, BEFORE ANY CONDITIONAL RETURN
   const [rotData, setRotData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [view,    setView]    = useState("overview");
   const [selSec,  setSelSec]  = useState(null);
-  const [chartSym, setChartSym] = useState(null);  // ETF chart popup
+  const [chartSym, setChartSym] = useState(null);
   const [sortInd, setSortInd] = useState("avgChg");
   const [etfSort, setEtfSort] = useState("d1");
-  const [etfSortDir,setEtfSortDir] = useState(-1);
+  const [etfSortDir, setEtfSortDir] = useState(-1);
   const timerRef = useRef(null);
 
   const cardBg = dark ? T.surface : T.surface;
   const rowBg  = dark ? T.row : T.row;
 
+  // Load function
   const load = useCallback(async (silent=false) => {
     if (!silent) setLoading(true);
     try {
@@ -383,7 +358,6 @@ function RotationTab({ etfQuotes = {} }) {
       [...gainers,...losers,...volList].forEach(t=>{if(!bySymbol[t.symbol])bySymbol[t.symbol]=t;});
       const all = Object.values(bySymbol).filter(t=>t.sector);
 
-      // Group by sector
       const secMap = {};
       all.forEach(t=>{
         const s=t.sector;
@@ -397,7 +371,6 @@ function RotationTab({ etfQuotes = {} }) {
         if(secMap[s]&&!secMap[s].volTickers.find(x=>x.symbol===t.symbol)) secMap[s].volTickers.push(t);
       });
 
-      // Build industry map from all tickers
       const indMap = {};
       all.filter(t=>t.industry).forEach(t=>{
         const k=`${t.sector}|${t.industry}`;
@@ -415,18 +388,15 @@ function RotationTab({ etfQuotes = {} }) {
         const adS=adPct*0.35, rvS=Math.min(avgRV/4*25,25);
         const score=Math.round(chgS+adS+rvS);
 
-        // Match GICS definition
         const gicsDef = GICS[s.sector] || null;
         const etfSym = gicsDef?.etf || null;
         const etf = etfSym ? etfQuotes[etfSym] : null;
 
-        // Sub-ETF data
         const subEtfData = gicsDef?.subEtfs?.map(se=>({
           ...se,
           data: etfQuotes[se.sym] || null,
         })) || [];
 
-        // Industries in this sector
         const sectorInds = Object.values(indMap)
           .filter(i=>i.sector===s.sector)
           .map(i=>{
@@ -454,7 +424,6 @@ function RotationTab({ etfQuotes = {} }) {
         };
       }).sort((a,b)=>b.score-a.score);
 
-      // All industries across all sectors
       const allInds = Object.values(indMap).map(i=>{
         const n=i.tickers.length;
         return{...i,n,avgChg:+(i.tickers.reduce((a,t)=>a+t.change,0)/n).toFixed(2),
@@ -465,24 +434,37 @@ function RotationTab({ etfQuotes = {} }) {
       }).filter(i=>i.n>=1);
 
       setRotData({sectors,allInds,gainers,losers,volList,ts:new Date()});
-      if (!silent) setSelSec(null);  // preserve selection on background refresh
+      if (!silent) setSelSec(null);
     } catch(e){console.error(e);}
     finally{setLoading(false);}
   },[etfQuotes]);
 
-  useEffect(()=>{load();},[]);
-  useEffect(()=>{
-    timerRef.current=setInterval(()=>load(true),90_000);
-    return()=>clearInterval(timerRef.current);
-  },[load]);
+  // ✅ All useEffect calls – unconditional
+  useEffect(() => {
+    load();
+  }, []);
 
-  if(loading&&!rotData) return(
+  useEffect(() => {
+    timerRef.current = setInterval(() => load(true), 90_000);
+    return () => clearInterval(timerRef.current);
+  }, [load]);
+
+  useEffect(() => {
+    if (!chartSym) return;
+    const h = (e) => { if (e.key === "Escape") setChartSym(null); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [chartSym]);
+
+  // ✅ Conditional returns are now safe – all hooks have run
+  if (loading && !rotData) return (
     <div style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:80,gap:18}}>
       <div style={{display:"flex",gap:6}}>{[0,1,2,3,4].map(i=><div key={i} style={{width:8,height:8,borderRadius:"50%",background:T.accent,animation:`bn 1s ${i*.15}s infinite`}}/>)}</div>
       <span style={{fontFamily:"monospace",fontSize:12,color:T.accent,letterSpacing:".1em"}}>SCANNING SECTOR ROTATION…</span>
     </div>
   );
-  if(!rotData) return null;
+  if (!rotData) return null;
+
   const {sectors,allInds,gainers,losers,volList,ts}=rotData;
   const leading=sectors.filter(s=>s.status==="LEADING");
   const neutral=sectors.filter(s=>s.status==="NEUTRAL");
@@ -522,21 +504,9 @@ function RotationTab({ etfQuotes = {} }) {
 
   const VIEW_BTNS=[["overview","OVERVIEW"],["etf","ETF DASHBOARD"],["industry","INDUSTRY DRILL"],["heatmap","HEAT MAP"]];
 
-  // Close chart popup on ESC
-  useEffect(() => {
-    if (!chartSym) return;
-    const h = (e) => { if (e.key === "Escape") setChartSym(null); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, [chartSym]);
-
-  return(
+  return (
     <div>
-      {/* Chart popup */}
-      {chartSym&&(
-        <TVChartPopup symbol={chartSym} onClose={()=>setChartSym(null)}/>
-      )}
-      {/* ── Toolbar ── */}
+      {chartSym && <TVChartPopup symbol={chartSym} onClose={()=>setChartSym(null)}/>}
       <div style={{display:"flex",gap:0,marginBottom:14,background:cardBg,border:`1px solid ${T.border}`,borderRadius:6,overflow:"hidden"}}>
         {VIEW_BTNS.map(([k,l])=>(
           <button key={k} onClick={()=>setView(k)}
@@ -561,13 +531,10 @@ function RotationTab({ etfQuotes = {} }) {
         </div>
       </div>
 
-      {/* ════════════ OVERVIEW ════════════ */}
-      {view==="overview"&&(
+      {/* ===== OVERVIEW ===== */}
+      {view==="overview" && (
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
-
-          {/* ── Main sector table with ETF benchmark row ── */}
           <div style={{background:cardBg,border:`1px solid ${T.border}`,borderRadius:8,overflow:"hidden"}}>
-            {/* Column headers */}
             <div style={{display:"grid",
               gridTemplateColumns:"170px 80px 80px 70px 60px 60px 70px 80px 80px 90px 120px",
               padding:"8px 16px",background:rowBg,borderBottom:`2px solid ${T.border2}`,gap:4,alignItems:"center"}}>
@@ -583,7 +550,6 @@ function RotationTab({ etfQuotes = {} }) {
               const etfD1 = s.etf?.d1;
               return(
                 <div key={s.sector}>
-                  {/* Sector row */}
                   <div
                     onClick={()=>setSelSec(isSelected?null:s.sector)}
                     style={{display:"grid",
@@ -596,7 +562,6 @@ function RotationTab({ etfQuotes = {} }) {
                     onMouseEnter={e=>{if(!isSelected)e.currentTarget.style.background=`${s.color}07`;}}
                     onMouseLeave={e=>{if(!isSelected)e.currentTarget.style.background="transparent";}}>
 
-                    {/* Name + ETF badge */}
                     <div>
                       <div style={{display:"flex",alignItems:"center",gap:6}}>
                         <span style={{fontFamily:"monospace",fontSize:11,fontWeight:700,color:T.text}}>{s.sector}</span>
@@ -611,7 +576,6 @@ function RotationTab({ etfQuotes = {} }) {
                       </div>
                     </div>
 
-                    {/* Performance cells */}
                     <div style={{textAlign:"center"}}><PCell v={s.avgChg} big/></div>
                     {[null,null,null,null].map((_,j)=>{
                       const keys=["d5","d1m","d3m","dYTD"];
@@ -619,7 +583,6 @@ function RotationTab({ etfQuotes = {} }) {
                       return<div key={j} style={{textAlign:"center"}}><PCell v={v}/></div>;
                     })}
 
-                    {/* A/D% */}
                     <div style={{display:"flex",flexDirection:"column",gap:2,alignItems:"center"}}>
                       <div style={{width:"100%",height:4,background:T.border,borderRadius:2,overflow:"hidden"}}>
                         <div style={{width:`${s.adPct}%`,height:"100%",borderRadius:2,
@@ -629,7 +592,6 @@ function RotationTab({ etfQuotes = {} }) {
                         color:s.adPct>=70?T.accent:s.adPct>=50?"#ffe040":T.down}}>{s.adPct}%</span>
                     </div>
 
-                    {/* Rel Vol */}
                     <div style={{textAlign:"center"}}>
                       <span style={{fontFamily:"monospace",fontSize:11,
                         color:s.avgRV>=2?"#ff9f1c":s.avgRV>=1.5?"#ffe040":T.textMid,fontWeight:700}}>
@@ -637,7 +599,6 @@ function RotationTab({ etfQuotes = {} }) {
                       </span>
                     </div>
 
-                    {/* Score bar */}
                     <div style={{display:"flex",alignItems:"center",gap:4}}>
                       <div style={{flex:1,height:6,background:T.border,borderRadius:3,overflow:"hidden"}}>
                         <div style={{width:`${s.score}%`,height:"100%",background:sc,borderRadius:3,transition:"width .8s"}}/>
@@ -645,7 +606,6 @@ function RotationTab({ etfQuotes = {} }) {
                       <span style={{fontFamily:"monospace",fontSize:10,fontWeight:700,color:sc,minWidth:20}}>{s.score}</span>
                     </div>
 
-                    {/* Status */}
                     <div style={{display:"flex",justifyContent:"center"}}>
                       <span style={{fontFamily:"monospace",fontSize:9,fontWeight:700,color:sc,
                         background:`${sc}15`,border:`1px solid ${sc}33`,padding:"3px 10px",borderRadius:3}}>
@@ -654,7 +614,6 @@ function RotationTab({ etfQuotes = {} }) {
                     </div>
                   </div>
 
-                  {/* ETF benchmark sub-row */}
                   {s.etf&&(
                     <div style={{display:"grid",
                       gridTemplateColumns:"170px 80px 80px 70px 60px 60px 70px 80px 80px 90px 120px",
@@ -671,7 +630,6 @@ function RotationTab({ etfQuotes = {} }) {
                       <div style={{textAlign:"center"}}>
                         <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint}}>ETF BENCH</span>
                       </div>
-                      {/* ETF performance across all periods */}
                       {["d1","d5","d1m","d3m","dYTD"].map(k=>(
                         <div key={k} style={{textAlign:"center"}}><PCell v={s.etf[k]}/></div>
                       ))}
@@ -690,10 +648,8 @@ function RotationTab({ etfQuotes = {} }) {
                     </div>
                   )}
 
-                  {/* Expanded detail panel */}
                   {isSelected&&sel&&(
                     <div style={{borderBottom:`1px solid ${s.color}22`,background:dark?T.inputBg:T.surface2}}>
-                      {/* Header */}
                       <div style={{padding:"12px 16px",background:`${s.color}0e`,
                         borderBottom:`1px solid ${s.color}22`,display:"flex",flexWrap:"wrap",gap:12,alignItems:"flex-start"}}>
                         <div style={{flex:1}}>
@@ -709,7 +665,6 @@ function RotationTab({ etfQuotes = {} }) {
                             </div>
                           </div>
                         </div>
-                        {/* Spotlight cards */}
                         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
                           {[["▲ TOP GAINER",sel.topG,T.accent],
                             ["▼ TOP LOSER", sel.topL,T.down],
@@ -724,14 +679,12 @@ function RotationTab({ etfQuotes = {} }) {
                         </div>
                       </div>
 
-                      {/* Sub-ETF grid */}
                       {sel.subEtfData?.length>0&&(
                         <div style={{padding:"10px 16px",borderBottom:`1px solid ${T.border}`}}>
                           <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,letterSpacing:".08em",marginBottom:8}}>
                             SUB-SECTOR ETFs
                           </div>
                           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))",gap:6}}>
-                            {/* Primary ETF first */}
                             <div onClick={()=>setChartSym(sel.etfSym)}
                               style={{background:cardBg,border:`1px solid ${s.color}44`,borderRadius:4,padding:"8px 10px",cursor:"pointer",transition:"border-color .15s"}}
                               onMouseEnter={e=>e.currentTarget.style.borderColor=s.color}
@@ -789,7 +742,6 @@ function RotationTab({ etfQuotes = {} }) {
                         </div>
                       )}
 
-                      {/* GICS Industries */}
                       {sel.sectorInds.length>0&&(
                         <div style={{padding:"10px 16px",borderBottom:`1px solid ${T.border}`}}>
                           <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,letterSpacing:".08em",marginBottom:8}}>
@@ -828,7 +780,6 @@ function RotationTab({ etfQuotes = {} }) {
                         </div>
                       )}
 
-                      {/* Gainers / Losers / Vol strip */}
                       <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr"}}>
                         {[["▲ GAINERS",sel.gainers.sort((a,b)=>b.change-a.change).slice(0,6),T.accent],
                           ["▼ LOSERS", sel.losers.sort((a,b)=>a.change-b.change).slice(0,6),T.down],
@@ -862,7 +813,6 @@ function RotationTab({ etfQuotes = {} }) {
             })}
           </div>
 
-          {/* ── Status columns ── */}
           <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:10}}>
             {[["LEADING",T.accent,leading],["NEUTRAL","#ffe040",neutral],["LAGGING",T.down,lagging]].map(([lbl,col,list])=>(
               <div key={lbl} style={{background:cardBg,border:`1px solid ${col}22`,borderRadius:6,overflow:"hidden"}}>
@@ -901,7 +851,6 @@ function RotationTab({ etfQuotes = {} }) {
             ))}
           </div>
 
-          {/* ── A/D Breadth + Rel Vol ── */}
           <div style={{background:cardBg,border:`1px solid ${T.border}`,borderRadius:8,overflow:"hidden"}}>
             <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,padding:"8px 16px",
               borderBottom:`1px solid ${T.border}`,letterSpacing:".1em"}}>
@@ -956,10 +905,9 @@ function RotationTab({ etfQuotes = {} }) {
         </div>
       )}
 
-      {/* ════════════ ETF DASHBOARD ════════════ */}
-      {view==="etf"&&(
+      {/* ===== ETF DASHBOARD ===== */}
+      {view==="etf" && (
         <div>
-          {/* Primary sector ETFs */}
           <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,letterSpacing:".1em",marginBottom:10}}>
             <div style={{display:"flex",gap:6,alignItems:"center"}}>
               <span>11 SECTOR ETFs (SPDR)</span>
@@ -1042,75 +990,90 @@ function RotationTab({ etfQuotes = {} }) {
             })}
           </div>
 
-          {/* Sub-sector ETF table */}
           <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,letterSpacing:".1em",marginBottom:8}}>
             SUB-SECTOR ETFs — FULL UNIVERSE
           </div>
           <div style={{background:cardBg,border:`1px solid ${T.border}`,borderRadius:8,overflow:"hidden"}}>
-            <div style={{display:"grid",gridTemplateColumns:"80px 1fr 120px 80px 70px 70px 70px 70px 70px 60px 60px",
-              padding:"7px 14px",background:rowBg,borderBottom:`1px solid ${T.border2}`,gap:4}}>
-              {["ETF","NAME","FOCUS / SECTOR","PRICE","1D","1W","1M","3M","YTD","50D","200D"].map((h,i)=>(
-                <span key={h} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,
-                  letterSpacing:".06em",textAlign:i>=3?"center":"left"}}>{h}</span>
-              ))}
-            </div>
-            {Object.entries(GICS).flatMap(([sectorNm,cfg])=>
-              cfg.subEtfs.map(se=>({...se,sectorNm,sectorColor:cfg.color}))
-            ).map((se,i,arr)=>{
-              const d=etfQuotes[se.sym];
-              const c=d?(d.d1>0?T.accent:d.d1<0?T.down:T.textMid):T.textMid;
-              return(
-                <div key={se.sym} style={{display:"grid",
-                  gridTemplateColumns:"80px 1fr 120px 80px 70px 70px 70px 70px 70px 60px 60px",
-                  padding:"7px 14px",gap:4,alignItems:"center",
-                  borderBottom:i<arr.length-1?`1px solid ${T.border}`:"none",
-                  borderLeft:`3px solid ${se.sectorColor}`,
-                  opacity:d?1:0.5,transition:"background .1s"}}
-                  onMouseEnter={e=>e.currentTarget.style.background=`${se.sectorColor}06`}
-                  onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
-                  <span style={{fontFamily:"monospace",fontSize:12,color:T.text,fontWeight:700}}>{se.sym}</span>
-                  <span style={{fontFamily:"monospace",fontSize:9,color:T.textMid}}>{se.name.substring(0,34)}</span>
-                  <div>
-                    <span style={{fontFamily:"monospace",fontSize:8,color:se.sectorColor,
-                      background:`${se.sectorColor}18`,border:`1px solid ${se.sectorColor}30`,
-                      padding:"1px 5px",borderRadius:3}}>{se.focus}</span>
-                  </div>
-                  {d?<>
-                    <div style={{textAlign:"center",fontFamily:"monospace",fontSize:10,color:T.text}}>${d.price.toFixed(2)}</div>
-                    {["d1","d5","d1m","d3m","dYTD"].map(k=>(
-                      <div key={k} style={{textAlign:"center"}}>
-                        {d[k]!=null
-                          ?<span style={{fontFamily:"monospace",fontSize:10,fontWeight:700,
-                              color:d[k]>0?T.accent:d[k]<0?T.down:T.textMid}}>
-                              {d[k]>=0?"+":""}{d[k].toFixed(1)}%
-                            </span>
-                          :<span style={{fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</span>}
-                      </div>
-                    ))}
-                    {[d.a50,d.a200].map((v,j)=>{
-                      const ab=v===true,no=v===false;
-                      return<div key={j} style={{textAlign:"center"}}>
-                        <span style={{fontFamily:"monospace",fontSize:8,fontWeight:700,
-                          color:ab?T.accent:no?T.down:T.textGhost,
-                          background:ab?"rgba(0,232,122,.1)":no?"rgba(255,69,96,.1)":"transparent",
-                          padding:"2px 3px",borderRadius:2,border:`1px solid ${ab?"rgba(0,232,122,.2)":no?"rgba(255,69,96,.2)":"transparent"}`}}>
-                          {["50D","200D"][j]}{ab?"▲":no?"▼":""}
-                        </span>
-                      </div>;
-                    })}
-                  </>:<>
-                    <div style={{textAlign:"center",fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</div>
-                    {[0,1,2,3,4,5,6].map(k=><div key={k} style={{textAlign:"center",fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</div>)}
-                  </>}
-                </div>
-              );
-            })}
+        <div style={{display:"grid",gridTemplateColumns:"80px 1fr 120px 80px 70px 70px 70px 70px 70px 60px 60px",
+    padding:"7px 14px",background:rowBg,borderBottom:`1px solid ${T.border2}`,gap:4}}>
+    {["ETF","NAME","FOCUS / SECTOR","PRICE","1D","1W","1M","3M","YTD","50D","200D"].map((h,i)=>(
+      <span key={h} style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,
+        letterSpacing:".06em",textAlign:i>=3?"center":"left"}}>{h}</span>
+    ))}
+  </div>
+  {(() => {
+    const uniqueEtfs = new Map();
+    for (const [sectorNm, cfg] of Object.entries(GICS)) {
+      for (const se of cfg.subEtfs) {
+        if (!uniqueEtfs.has(se.sym)) {
+          uniqueEtfs.set(se.sym, { ...se, sectorNm, sectorColor: cfg.color });
+        }
+      }
+    }
+    return Array.from(uniqueEtfs.values()).map((se, i, arr) => {
+      const d = etfQuotes[se.sym];
+      const c = d ? (d.d1 > 0 ? T.accent : d.d1 < 0 ? T.down : T.textMid) : T.textMid;
+      return (
+        <div key={se.sym} style={{display:"grid",
+          gridTemplateColumns:"80px 1fr 120px 80px 70px 70px 70px 70px 70px 60px 60px",
+          padding:"7px 14px",gap:4,alignItems:"center",
+          borderBottom:i < arr.length-1 ? `1px solid ${T.border}` : "none",
+          borderLeft:`3px solid ${se.sectorColor}`,
+          opacity:d ? 1 : 0.5, transition:"background .1s"}}
+          onMouseEnter={e=>e.currentTarget.style.background=`${se.sectorColor}06`}
+          onMouseLeave={e=>e.currentTarget.style.background="transparent"}>
+          <span style={{fontFamily:"monospace",fontSize:12,color:T.text,fontWeight:700}}>{se.sym}</span>
+          <span style={{fontFamily:"monospace",fontSize:9,color:T.textMid}}>{se.name.substring(0,34)}</span>
+          <div>
+            <span style={{fontFamily:"monospace",fontSize:8,color:se.sectorColor,
+              background:`${se.sectorColor}18`,border:`1px solid ${se.sectorColor}30`,
+              padding:"1px 5px",borderRadius:3}}>{se.focus}</span>
           </div>
+          {d ? (
+            <>
+              <div style={{textAlign:"center",fontFamily:"monospace",fontSize:10,color:T.text}}>${d.price.toFixed(2)}</div>
+              {["d1","d5","d1m","d3m","dYTD"].map(k => (
+                <div key={k} style={{textAlign:"center"}}>
+                  {d[k] != null
+                    ? <span style={{fontFamily:"monospace",fontSize:10,fontWeight:700,
+                        color:d[k] > 0 ? T.accent : d[k] < 0 ? T.down : T.textMid}}>
+                        {d[k] >= 0 ? "+" : ""}{d[k].toFixed(1)}%
+                      </span>
+                    : <span style={{fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</span>
+                  }
+                </div>
+              ))}
+              {[d.a50, d.a200].map((v, j) => {
+                const ab = v === true, no = v === false;
+                return (
+                  <div key={j} style={{textAlign:"center"}}>
+                    <span style={{fontFamily:"monospace",fontSize:8,fontWeight:700,
+                      color:ab ? T.accent : no ? T.down : T.textGhost,
+                      background:ab ? "rgba(0,232,122,.1)" : no ? "rgba(255,69,96,.1)" : "transparent",
+                      padding:"2px 3px",borderRadius:2,
+                      border:`1px solid ${ab ? "rgba(0,232,122,.2)" : no ? "rgba(255,69,96,.2)" : "transparent"}`}}>
+                      {["50D","200D"][j]}{ab ? "▲" : no ? "▼" : ""}
+                    </span>
+                  </div>
+                );
+              })}
+            </>
+          ) : (
+            <>
+              <div style={{textAlign:"center",fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</div>
+              {[0,1,2,3,4,5,6].map(k => <div key={k} style={{textAlign:"center",fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</div>)}
+            </>
+          )}
+        </div>
+      );
+    });
+  })()}
+</div>
         </div>
       )}
 
-      {/* ════════════ INDUSTRY DRILL ════════════ */}
-      {view==="industry"&&(
+      {/* ===== INDUSTRY DRILL ===== */}
+      {view==="industry" && (
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12}}>
           <div style={{background:cardBg,border:`1px solid rgba(0,232,122,.2)`,borderRadius:8,overflow:"hidden"}}>
             <div style={{fontFamily:"monospace",fontSize:8,color:T.accent,padding:"8px 14px",
@@ -1217,7 +1180,7 @@ function RotationTab({ etfQuotes = {} }) {
         </div>
       )}
 
-      {/* ════════════ HEAT MAP ════════════ */}
+      {/* ===== HEAT MAP ===== */}
       {view==="heatmap"&&(
         <div style={{display:"flex",flexDirection:"column",gap:12}}>
           <div style={{background:cardBg,border:`1px solid ${T.border}`,borderRadius:8,padding:"16px 18px"}}>
@@ -1257,7 +1220,6 @@ function RotationTab({ etfQuotes = {} }) {
             </div>
           </div>
 
-          {/* Momentum spectrum */}
           <div style={{background:cardBg,border:`1px solid ${T.border}`,borderRadius:8,padding:"14px 18px"}}>
             <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,letterSpacing:".1em",marginBottom:10}}>
               MOMENTUM SPECTRUM — screener avg vs ETF benchmark
@@ -1294,7 +1256,3 @@ function RotationTab({ etfQuotes = {} }) {
     </div>
   );
 }
-
-
-
-export default RotationTab;

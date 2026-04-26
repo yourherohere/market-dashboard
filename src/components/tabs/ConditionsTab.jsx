@@ -59,7 +59,7 @@ function adScore(ratio) {
   return Math.max(5, Math.round(ratio*50));
 }
 function scoreColor(s) {
-  if (s==null) return "var(--clr-text)"Faint;
+  if (s==null) return "var(--clr-faint)";
   return s>=70 ? "var(--clr-accent)" : s>=50 ? "#ffe040" : "var(--clr-dn)";
 }
 function signalLabel(s) {

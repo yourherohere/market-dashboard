@@ -295,10 +295,10 @@ const SECTOR_INDUSTRY_MAP = {
 const ALL_SECTORS = Object.keys(SECTOR_INDUSTRY_MAP);
 
 // ─── MULTI-SELECT DROPDOWN ────────────────────────────────────────────────────
-function MultiSelectDropdown({ label, options, selected, onChange, _color, width=200 }) {
+function MultiSelectDropdown({ label, options, selected, onChange, color, width=200 }) {
   const _tk2 = useTheme();
   const T2   = THEME[_tk2] || THEME.night;
-  const _color = _color || T2.accent;
+  const _color = color || T2.accent;
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {

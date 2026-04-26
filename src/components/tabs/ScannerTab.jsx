@@ -1430,14 +1430,14 @@ function ScannerTab() {
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Sector ETF</span>
               <MultiSelectDropdown label="Sector ETF"
-                options={[XLK","XLV","XLF","XLY","XLP","XLC","XLE","XLB","XLI","XLU","XLRE"].map(s=>s)}
+                options={["XLK","XLV","XLF","XLY","XLP","XLC","XLE","XLB","XLI","XLU","XLRE"].map(s=>s)}
                 selected={eodF.sectorEtfs} onChange={v=>setE("sectorEtfs",v)}
                 color="#a78bfa" width={180}/>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Industry ETF</span>
               <MultiSelectDropdown label="Industry ETF"
-                options={[SOXX","IGV","CLOU","FDN","CIBR","BOTZ","ESPO","IBB","XBI","IHI","PJP","XHS","KRE","KBE","KCE","KIE","XRT","XHB","PEJ","XOP","OIH","AMLP","TAN","URA","GDX","GDXJ","SIL","XME","COPX","LIT","ITA","JETS","IYT","PAVE","VNQ","IYZ"].map(s=>s)}
+                options={["SOXX","IGV","CLOU","FDN","CIBR","BOTZ","ESPO","IBB","XBI","IHI","PJP","XHS","KRE","KBE","KCE","KIE","XRT","XHB","PEJ","XOP","OIH","AMLP","TAN","URA","GDX","GDXJ","SIL","XME","COPX","LIT","ITA","JETS","IYT","PAVE","VNQ","IYZ"].map(s=>s)}
                 selected={eodF.industryEtfs} onChange={v=>setE("industryEtfs",v)}
                 color="#00d4ff" width={200}/>
             </div>

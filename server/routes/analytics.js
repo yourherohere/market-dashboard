@@ -4,11 +4,11 @@ import { cache }   from "../cache.js";
 import { CACHE }   from "../config.js";
 import { db }      from "../db/index.js";
 import { log }     from "../logger.js";
-// Input validation helpers
-const clampInt = (v,mn,mx,def) => { const n=parseInt(v,10); return isNaN(n)?def:Math.max(mn,Math.min(mx,n)); };
-const clampFlt = (v,mn,mx,def) => { const n=parseFloat(v); return isNaN(n)?def:Math.max(mn,Math.min(mx,n)); };
-function validateEmaList(e) { const V=new Set(["10","20","50","100","200"]); return String(e||"50").split(",").map(x=>x.trim()).filter(x=>V.has(x)); }
-
+import {
+  computeAnalytics, computeBreadthMetrics,
+  computeSectorBreadth, computeIndustryBreadth,
+  computeNHNL, computeMcClellan,
+} from "../jobs/compute-analytics.js";
 // ── Input validation helpers (inline — no external middleware dep) ────────────
 const VALID_SYMBOL    = /^[A-Z0-9.\-^]{1,10}$/i;
 const VALID_SORT_CHARS = /^[a-z0-9_]{1,30}$/;
@@ -18,25 +18,9 @@ function validateEmaList(emas) {
   const VALID = new Set(["10","20","50","100","200"]);
   return String(emas||"50").split(",").map(e=>e.trim()).filter(e=>VALID.has(e));
 }
-import {
-  computeAnalytics, computeBreadthMetrics,
-  computeSectorBreadth, computeIndustryBreadth,
-  computeNHNL, computeMcClellan,
-} from "../jobs/compute-analytics.js";
 
 export const analyticsRouter = Router();
 
-// ── Input validation helpers ─────────────────────────────────────────────────
-const VALID_SYMBOL = /^[A-Z0-9.\-^]{1,10}$/i;
-const VALID_SECTOR = /^[A-Za-z0-9 &/_\-]{1,60}$/;
-const VALID_SORT_CHARS = /^[a-z0-9_]{1,30}$/;
-const clampInt  = (v, min, max, def) => { const n = parseInt(v,10); return isNaN(n)?def:Math.max(min,Math.min(max,n)); };
-const clampFlt  = (v, min, max, def) => { const n = parseFloat(v);  return isNaN(n)?def:Math.max(min,Math.min(max,n)); };
-
-function validateEmaList(emas) {
-  const VALID = new Set(["10","20","50","100","200"]);
-  return String(emas||"50").split(",").map(e=>e.trim()).filter(e=>VALID.has(e));
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: ensure v8 EMA columns exist before any query uses them
@@ -115,7 +99,7 @@ analyticsRouter.get("/api/analytics/internals", async (req, res) => {
 
 // ── GET /api/analytics/setup ──────────────────────────────────────────────────
 // Returns ALL symbols from universe (LEFT JOIN) + optional filter params
-analyticsRouter.get("/api/analytics/setup", validateQuery(SCAN_SCHEMA), async (req, res) => {
+analyticsRouter.get("/api/analytics/setup", async (req, res) => {
   const q = req.query;
   const minScore  = clampFlt(q.minScore,  0,   100, 0);
   const maxScore  = clampFlt(q.maxScore,  0,   100, 100);
@@ -221,7 +205,6 @@ analyticsRouter.get("/api/analytics/setup", validateQuery(SCAN_SCHEMA), async (r
 //
 // EMA always computed LIVE from eod_prices — never from stale stored columns.
 analyticsRouter.get("/api/analytics/ema-cross",
-  validateQuery({ ...SCAN_SCHEMA, minTouches: { type:"int", min:1, max:5, default:1 }}),
   async (req, res) => {
   const {
     emas       = "10,20",  // selected EMA periods, comma-separated

@@ -1,11 +1,10 @@
+// src/components/tabs/PremarketTab.jsx
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useTheme, THEME } from "../../hooks/useTheme.js";
 import { Spark, McapBadge, EmaBadge, PctCell, LoadingDots, ScoreDial } from "../common/index.jsx";
 import { pct, fmt, gc, fmtMcap, fmtVol, calcRet, calcRetSince, soM, soY, sparkPath } from "../../utils/format.js";
 import { GICS, ALL_ETF_SYMS, SECTOR_ETF_SYMS, SUB_ETF_SYMS, secCol, INDEX_SYMS } from "../../constants/gics.js";
 
-// API base: empty string = same origin (via Vite proxy in dev, same-origin in prod)
-// Override with VITE_API_BASE_URL env var for remote deployments
 const BASE = (typeof __API_BASE__ !== "undefined" && __API_BASE__) ? __API_BASE__ : "";
 async function apiFetch(path, opts={}) {
   const url = path.startsWith("http") ? path : BASE + path;
@@ -13,365 +12,6 @@ async function apiFetch(path, opts={}) {
   if (!res.ok) { const e=await res.json().catch(()=>({error:res.statusText})); throw new Error(e.error||"HTTP "+res.status); }
   return res.json();
 }
-
-const heat = v => {
-  if(v>=5)  return{bg:"rgba(0,232,122,.25)",fg:T.accent};
-  if(v>=2)  return{bg:"rgba(0,232,122,.12)",fg:T.accent};
-  if(v>=0)  return{bg:"rgba(0,232,122,.05)",fg:"#7ab89a"};
-  if(v>=-2) return{bg:"rgba(255,69,96,.05)",fg:T.down};
-  if(v>=-5) return{bg:"rgba(255,69,96,.12)",fg:"#ff6060"};
-  return      {bg:"rgba(255,69,96,.25)",fg:T.down};
-};
-
-const calcRS = (secRet, spyRet) => {
-  if (secRet==null||spyRet==null||spyRet===0) return null;
-  return +(((1+secRet/100)/(1+spyRet/100))*100-100).toFixed(2);
-};
-const calcCompositeRS = (s, spy) => {
-  const w1m=calcRS(s.d1m,spy.d1m), w3m=calcRS(s.d3m,spy.d3m), w6m=calcRS(s.d6m,spy.d6m);
-  if(w1m==null&&w3m==null&&w6m==null) return null;
-  return +((w1m||0)*0.25+(w3m||0)*0.35+(w6m||0)*0.40).toFixed(2);
-};
-
-function SigBadge({ sig }) {
-  const _tk = useTheme();
-  const T   = THEME[_tk] || THEME.night;
-
-  const colors = { BREAKOUT:T.accent, "BUY ZONE":T.accent, PULLBACK:"#ff9f1c", BREAKDOWN:T.down };
-  const c = colors[sig] || T.textDim;
-  if (!sig) return null;
-  return <span style={{fontFamily:"monospace",fontSize:8,fontWeight:700,color:c,
-    background:`${c}18`,border:`1px solid ${c}30`,padding:"1px 5px",borderRadius:2}}>{sig}</span>;
-}
-
-function calcEMASeries(candles, period) {
-  if (candles.length < period) return [];
-  const k = 2 / (period + 1);
-  let ema = candles.slice(0, period).reduce((a, b) => a + b.close, 0) / period;
-  const out = [];
-  candles.forEach((c, i) => {
-    if (i < period - 1) return;
-    if (i === period - 1) { out.push({ time: c.time, value: +ema.toFixed(4) }); return; }
-    ema = c.close * k + ema * (1 - k);
-    out.push({ time: c.time, value: +ema.toFixed(4) });
-  });
-  return out;
-}
-
-function TVChartPopup({ symbol, onClose }) {
-  const containerRef = useRef(null);
-  const chartRef     = useRef(null);
-  const [loading, setLoading] = useState(true);
-  const [err,     setErr]     = useState(null);
-  const [info,    setInfo]    = useState(null);
-  const themeKey = useTheme();
-  const T = THEME[themeKey] || THEME.night;
-
-  const W = Math.max(480, Math.floor(window.innerWidth * 0.50));
-
-  function destroyChart() {
-    if (chartRef.current) {
-      try { chartRef.current.remove(); } catch(e) {}
-      chartRef.current = null;
-    }
-  }
-
-  async function buildChart() {
-    if (!containerRef.current) return;
-    setLoading(true); setErr(null); setInfo(null);
-    try {
-      const res = await fetch(`${BASE}/api/candles?symbol=` + encodeURIComponent(symbol) + "&days=365");
-      if (!res.ok) throw new Error("API error " + res.status);
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      const data = json.data;
-      if (!data || data.length === 0) throw new Error("No candle data returned");
-
-      if (!containerRef.current) return;
-      destroyChart();
-
-      const LC = window.LightweightCharts;
-      const chartH = containerRef.current.clientHeight;
-      // Read current theme from body background to auto-detect day/night
-      // Use CSS variable values (read from :root after applyTheme has run)
-      const rootStyle = getComputedStyle(document.documentElement);
-      const cBg   = rootStyle.getPropertyValue("--chartBg").trim()   || T.chartBg;
-      const cGrid = rootStyle.getPropertyValue("--chartGrid").trim() || T.chartGrid;
-      const cBdr  = rootStyle.getPropertyValue("--chartBorder").trim()|| T.chartBorder;
-      const cTxt  = rootStyle.getPropertyValue("--chartText").trim() || T.chartText;
-
-      const chart = LC.createChart(containerRef.current, {
-        width:  containerRef.current.clientWidth,
-        height: chartH,
-        layout: { background: { color: cBg }, textColor: cTxt },
-        grid:   { vertLines: { color: cGrid }, horzLines: { color: cGrid } },
-        crosshair: { mode: LC.CrosshairMode.Normal },
-        rightPriceScale: { borderColor: cBdr, scaleMargins: { top: 0.08, bottom: 0.28 } },
-        timeScale: { borderColor: cBdr, timeVisible: true, secondsVisible: false },
-        handleScroll: true, handleScale: true,
-      });
-      chartRef.current = chart;
-
-      const candles = chart.addCandlestickSeries({
-        upColor: T.accent, downColor: T.down,
-        borderUpColor: T.accent, borderDownColor: T.down,
-        wickUpColor: "#00e87a88", wickDownColor: "#ff456088",
-      });
-      candles.setData(data);
-
-      const vol = chart.addHistogramSeries({
-        color: T.textGhost, priceFormat: { type: "volume" },
-        priceScaleId: "vol",
-      });
-      chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.76, bottom: 0 } });
-      vol.setData(data.map(function(d) {
-        return {
-          time:  d.time,
-          value: d.volume,
-          color: d.close >= d.open ? "rgba(0,232,122,0.28)" : "rgba(255,69,96,0.28)",
-        };
-      }));
-
-      var emaStyles = [
-        { period: 20,  color: "#00e5ff", width: 0.8 },
-        { period: 50,  color: "#ffe040", width: 1   },
-        { period: 200, color: "#ff6b6b", width: 1.2 },
-      ];
-      emaStyles.forEach(function(e) {
-        var emaData = calcEMASeries(data, e.period);
-        if (emaData.length === 0) return;
-        var line = chart.addLineSeries({
-          color: e.color, lineWidth: e.width,
-          priceLineVisible: false, lastValueVisible: true,
-          crosshairMarkerVisible: false,
-        });
-        line.setData(emaData);
-      });
-
-      chart.timeScale().fitContent();
-
-      var last = data[data.length - 1];
-      var prev = data[data.length - 2];
-      var chg  = prev ? +((last.close - prev.close) / prev.close * 100).toFixed(2) : 0;
-      var chgD = prev ? +(last.close - prev.close).toFixed(2) : 0;
-      setInfo({ price: last.close, change: chg, changeDol: chgD });
-
-      if (window.ResizeObserver) {
-        var ro = new ResizeObserver(function() {
-          if (containerRef.current && chartRef.current) {
-            chartRef.current.applyOptions({ width: containerRef.current.clientWidth });
-          }
-        });
-        ro.observe(containerRef.current);
-      }
-    } catch(e) {
-      setErr(e.message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(function() {
-    if (!symbol) return;
-    destroyChart();
-    if (window.LightweightCharts) {
-      buildChart();
-    } else {
-      var script = document.createElement("script");
-      script.src = "https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js";
-      script.onload  = buildChart;
-      script.onerror = function() { setErr("Failed to load chart library"); setLoading(false); };
-      document.head.appendChild(script);
-    }
-    return function() { destroyChart(); };
-  }, [symbol, themeKey]);
-
-  if (!symbol) return null;
-
-  var changeColor = info && info.change > 0 ? T.accent : info && info.change < 0 ? T.down : T.textMid;
-
-  return (
-    <div style={{
-      position:"fixed", top:48, right:0,
-      width:"50vw", minWidth:480, height:"calc(100vh - 48px)",
-      zIndex:9999, background:T.chartBg,
-      borderLeft:`1px solid ${T.border2}`,
-      boxShadow:"-14px 0 48px rgba(0,0,0,.7)",
-      display:"flex", flexDirection:"column",
-      animation:"tvFadeIn .18s ease",
-    }}>
-      {/* Header */}
-      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",
-        padding:"10px 14px",background:T.header,borderBottom:`1px solid ${T.border}`,flexShrink:0}}>
-        <div style={{display:"flex",alignItems:"center",gap:12,minWidth:0}}>
-          <span style={{fontFamily:"monospace",fontSize:16,color:T.text,fontWeight:700,letterSpacing:".04em"}}>
-            {symbol}
-          </span>
-          {info&&(
-            <div style={{display:"flex",alignItems:"center",gap:8}}>
-              <span style={{fontFamily:"monospace",fontSize:14,color:T.text,fontWeight:600}}>
-                ${info.price&&info.price.toFixed(2)}
-              </span>
-              <span style={{fontFamily:"monospace",fontSize:10,color:changeColor,fontWeight:700}}>
-                {info.change>=0?"+":""}{info.change}% ({info.changeDol>=0?"+":""}{info.changeDol})
-              </span>
-            </div>
-          )}
-        </div>
-        <div style={{display:"flex",gap:8,alignItems:"center",flexShrink:0}}>
-          <a href={"https://www.tradingview.com/chart/?symbol="+symbol} target="_blank" rel="noreferrer"
-            style={{fontFamily:"monospace",fontSize:8,color:T.accent,textDecoration:"none",
-              border:"1px solid #00e87a33",padding:"4px 8px",borderRadius:3,letterSpacing:".06em",whiteSpace:"nowrap"}}>
-            TV ↗
-          </a>
-          <span onClick={onClose}
-            style={{cursor:"pointer",color:T.textDim,fontSize:20,lineHeight:1,padding:"2px 6px"}}>×</span>
-        </div>
-      </div>
-
-      {/* EMA legend */}
-      <div style={{display:"flex",gap:14,padding:"5px 14px",background:T.surface2,
-        borderBottom:`1px solid ${T.border}`,flexShrink:0,alignItems:"center"}}>
-        {[["20 EMA","#00e5ff"],["50 EMA","#ffe040"],["200 EMA","#ff6b6b"],["Volume","rgba(0,232,122,0.3)"]].map(function(item) {
-          return (
-            <div key={item[0]} style={{display:"flex",alignItems:"center",gap:5}}>
-              <div style={{width:18,height:2,background:item[1],borderRadius:2}}/>
-              <span style={{fontFamily:"monospace",fontSize:8,color:T.textDim}}>{item[0]}</span>
-            </div>
-          );
-        })}
-        <span style={{fontFamily:"monospace",fontSize:7.5,color:T.border2,marginLeft:"auto"}}>
-          DAILY · scroll to zoom
-        </span>
-      </div>
-
-      {/* Chart */}
-      <div ref={containerRef} style={{flex:1,minHeight:0,position:"relative",overflow:"hidden"}}>
-        {loading&&(
-          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",
-            alignItems:"center",justifyContent:"center",background:"inherit",zIndex:2,gap:12}}>
-            <div style={{display:"flex",gap:5}}>
-              {[0,1,2,3,4].map(function(i){
-                return <div key={i} style={{width:7,height:7,borderRadius:"50%",background:T.accent,
-                  animation:"bn 1s "+(i*0.15)+"s infinite"}}/>;
-              })}
-            </div>
-            <span style={{fontFamily:"monospace",fontSize:9,color:T.textDim}}>Loading {symbol}…</span>
-          </div>
-        )}
-        {err&&!loading&&(
-          <div style={{position:"absolute",inset:0,display:"flex",flexDirection:"column",
-            alignItems:"center",justifyContent:"center",background:T.bg,zIndex:2,gap:12}}>
-            <span style={{fontFamily:"monospace",fontSize:10,color:T.down}}>⚠ {err}</span>
-            <a href={"https://www.tradingview.com/chart/?symbol="+symbol} target="_blank" rel="noreferrer"
-              style={{fontFamily:"monospace",fontSize:9,color:T.accent,padding:"5px 12px",
-                border:"1px solid #00e87a33",borderRadius:3,textDecoration:"none"}}>
-              Open on TradingView ↗
-            </a>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── SECTOR → INDUSTRY MAP ────────────────────────────────────────────────────
-const SECTOR_INDUSTRY_MAP = {
-  "Technology": ["Semiconductors","Software—Application","Software—Infrastructure","Computer Hardware","Consumer Electronics","Electronic Components","Electronics & Computer Distribution","Information Technology Services","Scientific & Technical Instruments","Communication Equipment","Solar"],
-  "Healthcare": ["Biotechnology","Drug Manufacturers—General","Drug Manufacturers—Specialty & Generic","Medical Devices","Medical Instruments & Supplies","Health Information Services","Healthcare Plans","Medical Care Facilities","Diagnostics & Research","Medical Distribution","Pharmaceutical Retailers"],
-  "Financial Services": ["Banks—Regional","Banks—Diversified","Asset Management","Capital Markets","Insurance—Life","Insurance—Property & Casualty","Insurance—Diversified","Insurance Brokers","Financial Data & Stock Exchanges","Credit Services","Mortgage Finance","Shell Companies"],
-  "Consumer Cyclical": ["Retail—Apparel","Retail—Specialty","Auto Manufacturers","Auto Parts","Internet Retail","Luxury Goods","Residential Construction","Restaurants","Gambling","Hotels & Motels","Department Stores","Furnishings, Fixtures & Appliances","Home Improvement Retail","Footwear & Accessories","Personal Services","Recreational Vehicles","Travel Services"],
-  "Consumer Defensive": ["Grocery Stores","Beverages—Non-Alcoholic","Beverages—Brewers","Beverages—Wineries & Distilleries","Discount Stores","Drug Stores","Food Distribution","Packaged Foods","Tobacco","Household & Personal Products","Education & Training Services","Food Confectioners"],
-  "Communication Services": ["Telecom Services","Entertainment","Internet Content & Information","Broadcasting","Electronic Gaming & Multimedia","Advertising Agencies","Publishing"],
-  "Energy": ["Oil & Gas E&P","Oil & Gas Integrated","Oil & Gas Refining & Marketing","Oil & Gas Midstream","Oil & Gas Equipment & Services","Coal","Uranium"],
-  "Basic Materials": ["Specialty Chemicals","Agricultural Inputs","Chemicals","Gold","Silver","Copper","Steel","Aluminum","Building Materials","Coking Coal","Other Industrial Metals & Mining","Other Precious Metals & Mining","Paper & Paper Products","Lumber & Wood Production"],
-  "Industrials": ["Aerospace & Defense","Airlines","Airports & Air Services","Building Products & Equipment","Business Equipment & Supplies","Engineering & Construction","Farm & Construction Equipment","Industrial Distribution","Integrated Freight & Logistics","Marine Shipping","Metal Fabrication","Pollution & Treatment Controls","Railroads","Rental & Leasing Services","Security & Protection Services","Specialty Industrial Machinery","Staffing & Employment Services","Tools & Accessories","Trucking","Waste Management","Conglomerates"],
-  "Real Estate": ["REIT—Diversified","REIT—Healthcare Facilities","REIT—Hotel & Motel","REIT—Industrial","REIT—Mortgage","REIT—Office","REIT—Residential","REIT—Retail","REIT—Specialty","Real Estate Services","Real Estate—Development"],
-  "Utilities": ["Utilities—Diversified","Utilities—Independent Power Producers","Utilities—Regulated Electric","Utilities—Regulated Gas","Utilities—Regulated Water","Utilities—Renewable"],
-};
-const ALL_SECTORS = Object.keys(SECTOR_INDUSTRY_MAP);
-
-// ─── MULTI-SELECT DROPDOWN ────────────────────────────────────────────────────
-function MultiSelectDropdown({ label, options, selected, onChange, _color, width=200 }) {
-  const _pmtk = useTheme();
-  const T3    = THEME[_pmtk] || THEME.night;
-  const _color = _color || T3.accent;
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, []);
-  const toggle = v => onChange(selected.includes(v) ? selected.filter(x=>x!==v) : [...selected, v]);
-  const clearAll = e => { e.stopPropagation(); onChange([]); };
-  const selCount = selected.length;
-  return (
-    <div ref={ref} style={{position:"relative",display:"inline-block",userSelect:"none"}}>
-      <div onClick={()=>setOpen(o=>!o)}
-        style={{display:"flex",alignItems:"center",gap:6,cursor:"pointer",background:T.inputBg,
-          border:`1px solid ${selCount>0?_color+"44":T.border2}`,borderRadius:4,padding:"6px 10px",
-          width,boxSizing:"border-box",boxShadow:selCount>0?`0 0 8px ${color}18`:"none"}}>
-        <span style={{fontFamily:"monospace",fontSize:9,color:selCount>0?color:T.textDim,flex:1,
-          overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",letterSpacing:".04em"}}>
-          {selCount===0?`ALL ${label.toUpperCase()}S`:selCount===1?selected[0]:`${selCount} ${label}s`}
-        </span>
-        {selCount>0&&<span onClick={clearAll} style={{color:T.textDim,fontSize:12,cursor:"pointer"}}>×</span>}
-        <span style={{color:T.textFaint,fontSize:9}}>{open?"▲":"▼"}</span>
-      </div>
-      {open&&(
-        <div style={{position:"absolute",top:"calc(100% + 4px)",left:0,zIndex:1000,background:T.bg,
-          border:`1px solid ${T.border2}`,borderRadius:5,width:Math.max(width,240),maxHeight:260,
-          overflowY:"auto",boxShadow:"0 8px 32px rgba(0,0,0,.7)"}}>
-          <div style={{padding:"6px 10px",borderBottom:"1px solid #0d1a26",display:"flex",gap:8}}>
-            <span onClick={()=>onChange(options)} style={{fontFamily:"monospace",fontSize:8,color,cursor:"pointer"}}>ALL</span>
-            <span style={{color:T.border2}}>|</span>
-            <span onClick={()=>onChange([])} style={{fontFamily:"monospace",fontSize:8,color:T.textDim,cursor:"pointer"}}>NONE</span>
-          </div>
-          {options.map(opt=>(
-            <div key={opt} onClick={()=>toggle(opt)}
-              style={{display:"flex",alignItems:"center",gap:8,padding:"7px 12px",cursor:"pointer",
-                background:selected.includes(opt)?`${color}0e`:"transparent",borderBottom:`1px solid ${T.border}`}}
-              onMouseEnter={e=>{ if(!selected.includes(opt)) e.currentTarget.style.background=T.border; }}
-              onMouseLeave={e=>{ e.currentTarget.style.background=selected.includes(opt)?`${color}0e`:"transparent"; }}>
-              <div style={{width:12,height:12,borderRadius:2,flexShrink:0,background:selected.includes(opt)?color:"transparent",
-                border:`1.5px solid ${selected.includes(opt)?color:T.border2}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
-                {selected.includes(opt)&&<span style={{color:"#000",fontSize:9,fontWeight:900,lineHeight:1}}>✓</span>}
-              </div>
-              <span style={{fontFamily:"monospace",fontSize:9,color:selected.includes(opt)?T.text:T.textDim,
-                overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{opt}</span>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── SCANNER TAB ──────────────────────────────────────────────────────────────
-
-// ─── PREMARKET TAB ────────────────────────────────────────────────────────────
-// Bloomberg-style premarket scanner with AI analysis via Claude API
-// Columns: PM% · PM Vol · PM RVol · PM$Vol · ATR% · ADR% · Short% · Float ·
-//          MktCap · AvgDolVol · Daily% · RVol · Category · Grade · Analysis
-
-const CATEGORY_COLORS = {
-  "Earnings":         { bg:"rgba(255,159,28,.15)", border:"rgba(255,159,28,.4)", text:"#ff9f1c" },
-  "Short Squeeze":    { bg:"rgba(255,69,96,.15)",  border:"rgba(255,69,96,.4)",  text:T.down },
-  "News / Catalyst":  { bg:"rgba(0,212,255,.13)",  border:"rgba(0,212,255,.35)", text:"#00d4ff" },
-  "Industry Move":    { bg:"rgba(77,219,158,.13)",  border:"rgba(77,219,158,.35)",text:T.accent },
-  "Pre-Market Move":  { bg:"rgba(90,122,138,.12)",  border:"rgba(90,122,138,.3)", text:T.textMid },
-  "New Product":      { bg:"rgba(138,43,226,.15)",  border:"rgba(138,43,226,.4)", text:"#c77dff" },
-  "New Contracts":    { bg:"rgba(0,232,122,.15)",   border:"rgba(0,232,122,.4)",  text:T.accent },
-  "Themes/Narratives":{ bg:"rgba(249,199,79,.12)",  border:"rgba(249,199,79,.35)","text":"#f9c74f" },
-};
-
-const GRADE_STYLE = {
-  A: { bg:"rgba(0,232,122,.18)", border:"rgba(0,232,122,.5)", text:T.accent },
-  B: { bg:"rgba(77,219,158,.15)",border:"rgba(77,219,158,.4)", text:T.accent },
-  C: { bg:"rgba(255,159,28,.15)",border:"rgba(255,159,28,.4)", text:"#ff9f1c" },
-  D: { bg:"rgba(255,69,96,.15)", border:"rgba(255,69,96,.4)",  text:T.down },
-};
 
 function fmtFloat(n) {
   if (!n) return "—";
@@ -384,7 +24,6 @@ function fmtFloat(n) {
 function PMCell({ v, suffix="%" , big, colorize=true }) {
   const _tk = useTheme();
   const T   = THEME[_tk] || THEME.night;
-
   if (v == null) return <span style={{fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</span>;
   const c = !colorize ? T.text
     : v > 10 ? T.accent : v > 5 ? T.accent : v > 0 ? T.accent
@@ -396,13 +35,42 @@ function PMCell({ v, suffix="%" , big, colorize=true }) {
   );
 }
 
-function PremarketTab() {
+export default function PremarketTab() {
   const themeKey = useTheme();
   const T = THEME[themeKey] || THEME.night;
   const dark = themeKey === "night";
   const cardBg = dark ? T.surface : T.surface;
   const rowBg  = dark ? T.row : T.row;
 
+  // ── Theme‑dependent style definitions moved inside component ──────────────
+  const heat = (v) => {
+    if(v>=5)  return{bg:"rgba(0,232,122,.25)",fg:T.accent};
+    if(v>=2)  return{bg:"rgba(0,232,122,.12)",fg:T.accent};
+    if(v>=0)  return{bg:"rgba(0,232,122,.05)",fg:"#7ab89a"};
+    if(v>=-2) return{bg:"rgba(255,69,96,.05)",fg:T.down};
+    if(v>=-5) return{bg:"rgba(255,69,96,.12)",fg:"#ff6060"};
+    return      {bg:"rgba(255,69,96,.25)",fg:T.down};
+  };
+
+  const CATEGORY_COLORS = {
+    "Earnings":         { bg:"rgba(255,159,28,.15)", border:"rgba(255,159,28,.4)", text:"#ff9f1c" },
+    "Short Squeeze":    { bg:"rgba(255,69,96,.15)",  border:"rgba(255,69,96,.4)",  text:T.down },
+    "News / Catalyst":  { bg:"rgba(0,212,255,.13)",  border:"rgba(0,212,255,.35)", text:"#00d4ff" },
+    "Industry Move":    { bg:"rgba(77,219,158,.13)",  border:"rgba(77,219,158,.35)",text:T.accent },
+    "Pre-Market Move":  { bg:"rgba(90,122,138,.12)",  border:"rgba(90,122,138,.3)", text:T.textMid },
+    "New Product":      { bg:"rgba(138,43,226,.15)",  border:"rgba(138,43,226,.4)", text:"#c77dff" },
+    "New Contracts":    { bg:"rgba(0,232,122,.15)",   border:"rgba(0,232,122,.4)",  text:T.accent },
+    "Themes/Narratives":{ bg:"rgba(249,199,79,.12)",  border:"rgba(249,199,79,.35)", text:"#f9c74f" },
+  };
+
+  const GRADE_STYLE = {
+    A: { bg:"rgba(0,232,122,.18)", border:"rgba(0,232,122,.5)", text:T.accent },
+    B: { bg:"rgba(77,219,158,.15)",border:"rgba(77,219,158,.4)", text:T.accent },
+    C: { bg:"rgba(255,159,28,.15)",border:"rgba(255,159,28,.4)", text:"#ff9f1c" },
+    D: { bg:"rgba(255,69,96,.15)", border:"rgba(255,69,96,.4)",  text:T.down },
+  };
+
+  // State and rest of the component (original logic unchanged)
   const [data,      setData]      = useState(null);
   const [loading,   setLoading]   = useState(true);
   const [minPMPct,  setMinPMPct]  = useState(2);
@@ -410,7 +78,7 @@ function PremarketTab() {
   const [sortDir,   setSortDir]   = useState(-1);
   const [selRow,    setSelRow]    = useState(null);
   const [analyses,  setAnalyses]  = useState({});
-  const [newsData,  setNewsData]  = useState({});   // { symbol -> { news, fundamentals, loading } }
+  const [newsData,  setNewsData]  = useState({});
   const [catFilter, setCatFilter] = useState(null);
   const [showCols,  setShowCols]  = useState({
     pmPct:true, pmVol:true, pmRVol:true, pmDolVol:true,
@@ -430,7 +98,6 @@ function PremarketTab() {
 
   useEffect(() => { loadData(); }, [minPMPct]);
 
-  // Load Finviz + SEC news for a symbol
   const loadNews = useCallback(async (symbol) => {
     if (newsData[symbol]?.news || newsData[symbol]?.loading) return;
     setNewsData(prev => ({...prev, [symbol]: {loading:true, news:[], fundamentals:{}}}));
@@ -448,26 +115,15 @@ function PremarketTab() {
     }
   }, [newsData]);
 
-  // ── Professional multi-step AI analysis ────────────────────────────────────
-  // Step 1: Web search for actual catalyst news (Claude + web_search tool)
-  // Step 2: Structured scoring across 4 pro dimensions (0-25 each = 0-100)
-  //         Impact · Quality · Explosiveness · Longevity
-  // Step 3: Grade derived from total score with specific thresholds
-  // Based on LoneStockTrader framework + traderwillhu EMA trend alignment
+  // ── AI analysis function (unchanged) ────────────────────────────────────────
   const analyzeStock = useCallback(async (row) => {
     if (analyses[row.symbol]?.grade) return;
     setAnalyses(prev => ({...prev, [row.symbol]: {loading:true, step:"Searching for catalyst news…"}}));
 
-    // ── Technical trend alignment (traderwillhu method) ──────────────────────
-    // Grade modifier based on EMA positioning:
-    //   BULLISH  (A factor): above50 AND above200 (EMA10 > EMA20 > SMA50 uptrend)
-    //   MIXED    (B factor): above50 XOR above200
-    //   BEARISH  (C/D factor): below50 AND below200
     const trendGrade = (row.above50 === true && row.above200 === true) ? "BULLISH"
       : (row.above50 === true || row.above200 === true) ? "MIXED"
       : (row.above50 === false && row.above200 === false) ? "BEARISH" : "UNKNOWN";
 
-    // ── Float tier classification ────────────────────────────────────────────
     const floatTier = !row.float ? "UNKNOWN"
       : row.float < 5e6  ? "MICRO (<5M)"
       : row.float < 20e6 ? "SMALL (5-20M)"
@@ -475,7 +131,6 @@ function PremarketTab() {
       : row.float < 200e6? "MID (50-200M)"
       : "LARGE (>200M)";
 
-    // ── Step 1: Search for actual catalyst ──────────────────────────────────
     const searchPrompt = `Search for the most recent news and catalyst driving ${row.symbol} (${row.name}) 
 premarket move of ${row.pmPct >= 0 ? "+" : ""}${row.pmPct}% today ${new Date().toDateString()}.
 Look for: earnings reports, revenue/EPS beats or misses, FDA decisions, contract wins, 
@@ -497,49 +152,11 @@ Return the key catalyst found in 2-3 sentences.`;
         })
       });
       const searchJson = await searchResp.json();
-      // Extract text response from web search result
       const textBlocks = (searchJson.content || []).filter(b => b.type === "text");
       if (textBlocks.length) catalystNews = textBlocks.map(b => b.text).join(" ").substring(0, 500);
     } catch(e) { /* use default */ }
 
     setAnalyses(prev => ({...prev, [row.symbol]: {loading:true, step:"Scoring setup quality…"}}));
-
-    // ── Step 2: Full structured scoring prompt ───────────────────────────────
-    // Scoring dimensions (each 0-25, total 0-100):
-    //
-    // IMPACT (0-25): Catalyst significance
-    //   25 = Tier-1 catalyst (earnings beat >15%, FDA approval, major contract)
-    //   20 = Strong catalyst (earnings beat 5-15%, analyst upgrade, partnership)
-    //   15 = Moderate catalyst (small earnings beat, industry news)
-    //   10 = Weak catalyst (general market/sector move)
-    //    5 = Speculative/no clear catalyst
-    //
-    // QUALITY (0-25): Setup quality & counterparty
-    //   25 = Clean technical break, confirmed volume, above all EMAs, respectable float
-    //   20 = Good setup with minor concerns
-    //   15 = Mixed signals
-    //   10 = Thin float <5M or below major EMAs
-    //    5 = Below all EMAs, declining trend, thin & illiquid
-    //
-    // EXPLOSIVENESS (0-25): Potential for continued large move
-    //   25 = ADR>7% + short>15% + float<20M + PM vol >2M shares
-    //   20 = ADR>5% + some short interest or thin float
-    //   15 = ADR>3% with moderate setup
-    //   10 = Low ADR, large float, limited explosive potential
-    //    5 = ADR<2%, massive float, slow mover
-    //
-    // LONGEVITY (0-25): Multi-day sustainability
-    //   25 = Strong fundamental catalyst + BULLISH EMA trend + institutional quality
-    //   20 = Good catalyst with mixed technicals
-    //   15 = One-day catalyst likely, some follow-through potential
-    //   10 = One-day pop, likely to fade
-    //    5 = Gap-and-trap risk, likely reversal
-    //
-    // Grade from total score:
-    //   85-100 = A (exceptional, high conviction)
-    //   70-84  = B (good setup, worth trading)
-    //   50-69  = C (marginal, trade with caution)
-    //   <50    = D (avoid)
 
     const analysisPrompt = `You are a professional day trader using the LoneStockTrader scoring framework.
 Analyze this premarket mover using the EXACT scoring rubric below. Return ONLY valid JSON.
@@ -633,7 +250,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
       const text = (json.content?.find(b => b.type === "text")?.text || "").trim();
       const clean = text.replace(/^```json\n?|\n?```$/g, "").trim();
       const parsed = JSON.parse(clean);
-      // Validate and clamp scores
       const s = parsed.scores || {};
       const clamped = {
         impact:       Math.min(25, Math.max(0, s.impact || 0)),
@@ -647,7 +263,7 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
         ...parsed,
         scores: clamped,
         total,
-        grade: derivedGrade, // use computed grade from scores, not LLM's
+        grade: derivedGrade,
         trendGrade,
         floatTier,
         catalystNews: catalystNews.substring(0, 300),
@@ -723,9 +339,8 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
 
   return (
     <div>
-      {/* ── Toolbar ── */}
+      {/* Toolbar */}
       <div style={{display:"flex",gap:10,marginBottom:12,flexWrap:"wrap",alignItems:"center"}}>
-        {/* Min PM% filter */}
         <div style={{display:"flex",gap:0,background:cardBg,border:`1px solid ${T.border}`,borderRadius:6,overflow:"hidden"}}>
           <span style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,padding:"7px 10px",
             borderRight:`1px solid ${T.border}`,display:"flex",alignItems:"center",whiteSpace:"nowrap"}}>
@@ -743,7 +358,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
           ))}
         </div>
 
-        {/* Catalyst filters */}
         <div style={{display:"flex",gap:5,flexWrap:"wrap"}}>
           <button onClick={()=>setCatFilter(null)}
             style={{fontFamily:"monospace",fontSize:8,padding:"5px 10px",border:"none",
@@ -782,9 +396,8 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
         </div>
       </div>
 
-      {/* ── Main Table ── */}
+      {/* Main Table */}
       <div style={{background:cardBg,border:`1px solid ${T.border}`,borderRadius:8,overflow:"hidden"}}>
-        {/* Column headers */}
         <div style={{display:"grid", gridTemplateColumns:gridTemplate,
           padding:"7px 14px",background:rowBg,
           borderBottom:`2px solid ${T.border2||T.border}`,gap:4,alignItems:"center",
@@ -797,7 +410,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
           </span>
         </div>
 
-        {/* Rows */}
         {sortedRows.length === 0 && !loading && (
           <div style={{padding:40,textAlign:"center",fontFamily:"monospace",fontSize:11,color:T.textFaint}}>
             No premarket movers ≥{minPMPct}% found. Markets may not be open yet.
@@ -814,7 +426,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
 
           return (
             <div key={row.symbol}>
-              {/* Main data row */}
               <div
                 onClick={() => {
                   setSelRow(isOpen ? null : row.symbol);
@@ -985,7 +596,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                   background:dark?T.inputBg:T.surface,
                   borderLeft:"3px solid rgba(0,212,255,.4)"}}>
 
-                  {/* Analysis loading */}
                   {analysis?.loading&&(
                     <div style={{padding:"14px 18px",fontFamily:"monospace",fontSize:10,
                       color:"#00d4ff",letterSpacing:".08em",display:"flex",alignItems:"center",gap:10}}>
@@ -997,14 +607,9 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                     </div>
                   )}
 
-                  {/* Analysis result */}
                   {analysis&&!analysis.loading&&(
                     <div style={{padding:"14px 18px"}}>
-
-                      {/* Top row: Grade + total score + trend + catalyst */}
                       <div style={{display:"flex",gap:12,marginBottom:14,flexWrap:"wrap",alignItems:"flex-start"}}>
-
-                        {/* Grade circle */}
                         {analysis.grade&&(()=>{
                           const gs2 = GRADE_STYLE[analysis.grade] || GRADE_STYLE.C;
                           return(
@@ -1021,7 +626,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                           );
                         })()}
 
-                        {/* Score bars */}
                         {analysis.scores&&(
                           <div style={{flex:"0 0 220px"}}>
                             <div style={{fontFamily:"monospace",fontSize:7.5,color:T.textFaint,
@@ -1048,9 +652,7 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                           </div>
                         )}
 
-                        {/* Trend + float + catalyst strip */}
                         <div style={{flex:1,minWidth:200}}>
-                          {/* Trend badge */}
                           {analysis.trendGrade&&(
                             <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
                               <span style={{fontFamily:"monospace",fontSize:8,fontWeight:700,
@@ -1074,7 +676,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                               )}
                             </div>
                           )}
-                          {/* Catalyst found */}
                           {analysis.catalyst&&(
                             <div style={{fontFamily:"monospace",fontSize:9,color:T.text,
                               lineHeight:1.5,marginBottom:6,
@@ -1084,7 +685,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                               {analysis.catalyst}
                             </div>
                           )}
-                          {/* Risk */}
                           {analysis.risks&&(
                             <div style={{fontFamily:"monospace",fontSize:8.5,color:"#ff9f1c",
                               lineHeight:1.5,padding:"5px 10px",background:"rgba(255,159,28,.07)",
@@ -1096,7 +696,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                         </div>
                       </div>
 
-                      {/* Reasoning */}
                       <div style={{fontFamily:"monospace",fontSize:10,color:T.text,
                         lineHeight:1.6,marginBottom:12,padding:"8px 12px",
                         background:cardBg,borderRadius:4,
@@ -1106,7 +705,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                         {analysis.reasoning}
                       </div>
 
-                      {/* Detail cards */}
                       {analysis.details&&(
                         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
                           {[
@@ -1131,7 +729,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                         </div>
                       )}
 
-                      {/* Catalyst news source */}
                       {analysis.catalystNews&&(
                         <div style={{marginTop:8,padding:"6px 10px",background:dark?T.bg:T.bg,
                           borderRadius:4,border:`1px solid ${T.border}`}}>
@@ -1147,7 +744,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                     </div>
                   )}
 
-                  {/* No analysis yet prompt */}
                   {!analysis&&(
                     <div style={{padding:"12px 18px",display:"flex",alignItems:"center",gap:12}}>
                       <span style={{fontFamily:"monospace",fontSize:9,color:T.textFaint}}>
@@ -1162,7 +758,7 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                     </div>
                   )}
 
-                  {/* ── NEWS + FUNDAMENTALS PANEL ── */}
+                  {/* News + fundamentals panel */}
                   {(()=>{
                     const nd = newsData[row.symbol];
                     const SEC_FORM_COLORS = {
@@ -1173,8 +769,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                       <div style={{borderTop:`1px solid ${T.border}`,
                         display:"grid",gridTemplateColumns:"1fr 300px",
                         gap:0}}>
-
-                        {/* News feed */}
                         <div style={{borderRight:`1px solid ${T.border}`,padding:"10px 14px"}}>
                           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                             <span style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,
@@ -1220,7 +814,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                                     transition:"background .1s"}}
                                     onMouseEnter={e=>e.currentTarget.style.background=isSec?"rgba(255,159,28,.08)":"rgba(255,255,255,.03)"}
                                     onMouseLeave={e=>e.currentTarget.style.background=isSec?"rgba(255,159,28,.05)":"transparent"}>
-                                    {/* Source badge */}
                                     <div style={{flexShrink:0,paddingTop:1}}>
                                       {isSec
                                         ?<span style={{fontFamily:"monospace",fontSize:7,fontWeight:700,
@@ -1237,7 +830,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                                           {item.source?.substring(0,12)||"News"}
                                         </span>}
                                     </div>
-                                    {/* Headline + date */}
                                     <div style={{flex:1,minWidth:0}}>
                                       {item.url
                                         ?<a href={item.url} target="_blank" rel="noopener noreferrer"
@@ -1268,7 +860,6 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
                           )}
                         </div>
 
-                        {/* Finviz fundamentals sidebar */}
                         <div style={{padding:"10px 14px"}}>
                           <div style={{fontFamily:"monospace",fontSize:8,color:T.textFaint,
                             letterSpacing:".08em",marginBottom:8}}>
@@ -1343,7 +934,3 @@ Return ONLY this JSON (no markdown, no backticks, no other text):
     </div>
   );
 }
-
-
-
-export default PremarketTab;

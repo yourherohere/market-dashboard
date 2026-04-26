@@ -24,10 +24,9 @@ async function apiFetch(p, o={}) {
 }
 
 // ── Mini bar chart ────────────────────────────────────────────────────────────
-function MiniBarChart({
+function MiniBarChart({ data=[], height=40, colorPos="var(--clr-accent)", colorNeg="var(--clr-dn)" }) {
   const _tk = useTheme();
   const T   = THEME[_tk] || THEME.night;
- data=[], height=40, colorPos="var(--clr-accent)", colorNeg="var(--clr-dn)" }) {
   if (!data.length) return (
     <div style={{height, background:T.row, borderRadius:3, display:"flex",
       alignItems:"center", justifyContent:"center"}}>
