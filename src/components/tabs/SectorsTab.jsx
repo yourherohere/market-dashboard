@@ -5,7 +5,9 @@ import { pct, fmt, gc, fmtMcap, fmtVol, calcRet, calcRetSince, soM, soY, sparkPa
 import { GICS, ALL_ETF_SYMS, SECTOR_ETF_SYMS, SUB_ETF_SYMS, secCol, INDEX_SYMS } from "../../constants/gics.js";
 
 // ── apiFetch helper ─────────────────────────────────────────────────────────
-const BASE = "http://localhost:3001";
+// API base: empty string = same origin (via Vite proxy in dev, same-origin in prod)
+// Override with VITE_API_BASE_URL env var for remote deployments
+const BASE = (typeof __API_BASE__ !== "undefined" && __API_BASE__) ? __API_BASE__ : "";
 async function apiFetch(path, opts={}) {
   const url = path.startsWith("http") ? path : BASE + path;
   const res = await fetch(url, { headers:{"Content-Type":"application/json"}, ...opts });
@@ -15,12 +17,12 @@ async function apiFetch(path, opts={}) {
 
 // ── Shared constants ─────────────────────────────────────────────────────────
 const heat = v => {
-  if(v>=5)  return{bg:"rgba(0,232,122,.25)",fg:T.accent};
-  if(v>=2)  return{bg:"rgba(0,232,122,.12)",fg:T.accent};
+  if(v>=5)  return{bg:"rgba(0,232,122,.25)",fg:"var(--clr-up)"};
+  if(v>=2)  return{bg:"rgba(0,232,122,.12)",fg:"var(--clr-up)"};
   if(v>=0)  return{bg:"rgba(0,232,122,.05)",fg:"#7ab89a"};
-  if(v>=-2) return{bg:"rgba(255,69,96,.05)", fg:T.down};
+  if(v>=-2) return{bg:"rgba(255,69,96,.05)", fg:"var(--clr-dn)"};
   if(v>=-5) return{bg:"rgba(255,69,96,.12)", fg:"#ff6060"};
-  return      {bg:"rgba(255,69,96,.25)",fg:T.down};
+  return      {bg:"rgba(255,69,96,.25)",fg:"var(--clr-dn)"};
 };
 
 function calcEMASeries(candles, period) {
@@ -55,7 +57,7 @@ function TVChartPopup({ symbol, onClose }) {
     if (!containerRef.current) return;
     setLoading(true); setErr(null); setInfo(null);
     try {
-      const res = await fetch(`http://localhost:3001/api/candles?symbol=${encodeURIComponent(symbol)}&days=365`);
+      const res = await fetch(`${BASE}/api/candles?symbol=${encodeURIComponent(symbol)}&days=365`);
       if (!res.ok) throw new Error("API error " + res.status);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -202,6 +204,9 @@ const ALL_SECTORS = Object.keys(SECTOR_INDUSTRY_MAP);
 
 // ─── DUMMY SIGBADGE (since original is not defined) ─────────────────────────
 function SigBadge({ sig }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   // Original component likely displayed a signal icon; fallback to a simple dash.
   return <span style={{ fontFamily:"monospace", fontSize:9, color:T.textDim }}>—</span>;
 }

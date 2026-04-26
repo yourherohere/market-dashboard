@@ -3,7 +3,9 @@ import { useTheme, THEME } from "../../hooks/useTheme.js";
 import { Spark, ScoreDial } from "../common/index.jsx";
 import { pct, gc } from "../../utils/format.js";
 
-const BASE = "http://localhost:3001";
+// API base: empty string = same origin (via Vite proxy in dev, same-origin in prod)
+// Override with VITE_API_BASE_URL env var for remote deployments
+const BASE = (typeof __API_BASE__ !== "undefined" && __API_BASE__) ? __API_BASE__ : "";
 async function apiFetch(p, o={}) {
   const r = await fetch(p.startsWith("http") ? p : BASE+p,
     { headers:{"Content-Type":"application/json"}, ...o });
@@ -14,6 +16,9 @@ async function apiFetch(p, o={}) {
 
 // ── Bidirectional A/D bar chart ───────────────────────────────────────────────
 function ADBarChart({ daily=[], height=56 }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   if (!daily.length) return (
     <div style={{height, background:T.row, borderRadius:3,
       display:"flex", alignItems:"center", justifyContent:"center"}}>
@@ -73,6 +78,9 @@ function fmtBig(n) {
 
 // ── Full A/D row panel (horizontal layout) ───────────────────────────────────
 function ADRow({ label, subtitle, daily=[], latestAdv, latestDec, latestRatio, cumLine=[] }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   const last     = daily[daily.length-1];
   const adv      = last?.adv  ?? latestAdv  ?? null;
   const dec      = last?.dec  ?? latestDec  ?? null;

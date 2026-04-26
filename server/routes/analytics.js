@@ -4,6 +4,7 @@ import { cache }   from "../cache.js";
 import { CACHE }   from "../config.js";
 import { db }      from "../db/index.js";
 import { log }     from "../logger.js";
+import { validateQuery, SCAN_SCHEMA } from "../middleware/validate.js";
 import {
   computeAnalytics, computeBreadthMetrics,
   computeSectorBreadth, computeIndustryBreadth,
@@ -12,13 +13,31 @@ import {
 
 export const analyticsRouter = Router();
 
+// ── Input validation helpers ─────────────────────────────────────────────────
+const VALID_SYMBOL = /^[A-Z0-9.\-^]{1,10}$/i;
+const VALID_SECTOR = /^[A-Za-z0-9 &/_\-]{1,60}$/;
+const VALID_SORT_CHARS = /^[a-z0-9_]{1,30}$/;
+const clampInt  = (v, min, max, def) => { const n = parseInt(v,10); return isNaN(n)?def:Math.max(min,Math.min(max,n)); };
+const clampFlt  = (v, min, max, def) => { const n = parseFloat(v);  return isNaN(n)?def:Math.max(min,Math.min(max,n)); };
+
+function validateEmaList(emas) {
+  const VALID = new Set(["10","20","50","100","200"]);
+  return String(emas||"50").split(",").map(e=>e.trim()).filter(e=>VALID.has(e));
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER: ensure v8 EMA columns exist before any query uses them
 // ─────────────────────────────────────────────────────────────────────────────
 function ensureEmaColumns() {
-  const cols = ["ema10","ema100","above_ema10","above_ema100"];
-  for (const c of cols) {
-    try { db.prepare(`ALTER TABLE eod_returns ADD COLUMN ${c} REAL`).run(); } catch {}
+  // Hardcoded ALTER TABLE statements — never interpolate column names into SQL
+  const stmts = [
+    "ALTER TABLE eod_returns ADD COLUMN ema10        REAL",
+    "ALTER TABLE eod_returns ADD COLUMN ema100       REAL",
+    "ALTER TABLE eod_returns ADD COLUMN above_ema10  INTEGER",
+    "ALTER TABLE eod_returns ADD COLUMN above_ema100 INTEGER",
+  ];
+  for (const sql of stmts) {
+    try { db.prepare(sql).run(); } catch {}  // duplicate column = already exists
   }
 }
 
@@ -83,20 +102,29 @@ analyticsRouter.get("/api/analytics/internals", async (req, res) => {
 
 // ── GET /api/analytics/setup ──────────────────────────────────────────────────
 // Returns ALL symbols from universe (LEFT JOIN) + optional filter params
-analyticsRouter.get("/api/analytics/setup", async (req, res) => {
-  const {
-    minScore = 0, maxScore = 100,
-    minRS    = 0, maxRS    = 99,
-    minPrice = 1, maxPrice = 99999,
-    minVol   = 0, minDolVol = 0,
-    stage    = 0,
-    sectors  = "", industries = "",
-    emaFilter = "any",
-    vcpMin   = 0, ppOnly = "0", rsLineHi = "0",
-    maxEarn  = 0,
-    sortBy   = "setup_score", sortDir = "desc",
-    limit    = 9999,
-  } = req.query;
+analyticsRouter.get("/api/analytics/setup", validateQuery(SCAN_SCHEMA), async (req, res) => {
+  const q = req.query;
+  const minScore  = clampFlt(q.minScore,  0,   100, 0);
+  const maxScore  = clampFlt(q.maxScore,  0,   100, 100);
+  const minRS     = clampFlt(q.minRS,     0,   99,  0);
+  const maxRS     = clampFlt(q.maxRS,     0,   99,  99);
+  const minPrice  = clampFlt(q.minPrice,  0,   99999, 1);
+  const maxPrice  = clampFlt(q.maxPrice,  0,   9999999, 99999);
+  const minVol    = clampInt(q.minVol,    0,   1e9, 0);
+  const minDolVol = clampInt(q.minDolVol, 0,   1e12, 0);
+  const stage     = clampInt(q.stage,     0,   4,  0);
+  const vcpMin    = clampFlt(q.vcpMin,    0,   100, 0);
+  const maxEarn   = clampInt(q.maxEarn,   0,   365, 0);
+  const limit     = clampInt(q.limit,     1,   99999, 9999);
+  const ppOnly    = q.ppOnly === "1" ? "1" : "0";
+  const rsLineHi  = q.rsLineHi === "1" ? "1" : "0";
+  const sortDir   = q.sortDir === "asc" ? "asc" : "desc";
+  const sortBy    = VALID_SORT_CHARS.test(q.sortBy||"") ? q.sortBy : "setup_score";
+  const emaFilter = ["any","above50","above200","above_both"].includes(q.emaFilter)
+    ? q.emaFilter : "any";
+  // Validate sector/industry: split and filter against safe pattern
+  const sectors    = q.sectors    || "";
+  const industries = q.industries || "";
 
   const ck  = `analytics:setup:${JSON.stringify(req.query)}`;
   const hit = cache.get(ck, 5 * 60_000);
@@ -179,7 +207,9 @@ analyticsRouter.get("/api/analytics/setup", async (req, res) => {
 //   signal = (touchMode=="min" ? touchedCount>=minTouches : touchedCount==selectedCount)
 //
 // EMA always computed LIVE from eod_prices — never from stale stored columns.
-analyticsRouter.get("/api/analytics/ema-cross", async (req, res) => {
+analyticsRouter.get("/api/analytics/ema-cross",
+  validateQuery({ ...SCAN_SCHEMA, minTouches: { type:"int", min:1, max:5, default:1 }}),
+  async (req, res) => {
   const {
     emas       = "10,20",  // selected EMA periods, comma-separated
     touchMode  = "min",    // "min" = Min touches(>=) | "all" = All selected must touch

@@ -4,7 +4,9 @@ import { Spark, McapBadge, EmaBadge, PctCell, LoadingDots, ScoreDial } from "../
 import { pct, fmt, gc, fmtMcap, fmtVol, calcRet, calcRetSince, soM, soY, sparkPath } from "../../utils/format.js";
 import { GICS, ALL_ETF_SYMS, SECTOR_ETF_SYMS, SUB_ETF_SYMS, secCol, INDEX_SYMS } from "../../constants/gics.js";
 
-const BASE = "http://localhost:3001";
+// API base: empty string = same origin (via Vite proxy in dev, same-origin in prod)
+// Override with VITE_API_BASE_URL env var for remote deployments
+const BASE = (typeof __API_BASE__ !== "undefined" && __API_BASE__) ? __API_BASE__ : "";
 async function apiFetch(path, opts={}) {
   const url = path.startsWith("http") ? path : BASE + path;
   const res = await fetch(url, { headers:{"Content-Type":"application/json"}, ...opts });
@@ -16,7 +18,7 @@ const heat = v => {
   if(v>=5)  return{bg:"rgba(63,185,80,.25)", fg:"var(--clr-up)"};
   if(v>=2)  return{bg:"rgba(63,185,80,.12)", fg:"var(--clr-up)"};
   if(v>=0)  return{bg:"rgba(63,185,80,.05)", fg:"#7ab89a"};
-  if(v>=-2) return{bg:"rgba(248,81,73,.05)", fg:T.down};
+  if(v>=-2) return{bg:"rgba(248,81,73,.05)", fg:"var(--clr-dn)"};
   if(v>=-5) return{bg:"rgba(248,81,73,.12)", fg:"#ff6060"};
   return      {bg:"rgba(248,81,73,.25)",     fg:"var(--clr-dn)"};
 };
@@ -88,7 +90,7 @@ function TVChartPopup({ symbol, onClose }) {
     if (!containerRef.current) return;
     setLoading(true); setErr(null); setInfo(null);
     try {
-      const res = await fetch("http://localhost:3001/api/candles?symbol=" + encodeURIComponent(symbol) + "&days=365");
+      const res = await fetch(`${BASE}/api/candles?symbol=` + encodeURIComponent(symbol) + "&days=365");
       if (!res.ok) throw new Error("API error " + res.status);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -464,7 +466,7 @@ function ScannerTab() {
     });
 
     try {
-      const resp = await fetch(`http://localhost:3001/api/scan/full/stream?${params}`, {
+      const resp = await fetch(`${BASE}/api/scan/full/stream?${params}`, {
         signal: univAbort.current.signal,
       });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -1428,14 +1430,14 @@ function ScannerTab() {
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Sector ETF</span>
               <MultiSelectDropdown label="Sector ETF"
-                options={["XLK","XLV","XLF","XLY","XLP","XLC","XLE","XLB","XLI","XLU","XLRE"].map(s=>s)}
+                options={[XLK","XLV","XLF","XLY","XLP","XLC","XLE","XLB","XLI","XLU","XLRE"].map(s=>s)}
                 selected={eodF.sectorEtfs} onChange={v=>setE("sectorEtfs",v)}
                 color="#a78bfa" width={180}/>
             </div>
             <div style={{display:"flex",flexDirection:"column",gap:3}}>
               <span style={{fontFamily:"monospace",fontSize:7.5,color:T.textDim}}>Industry ETF</span>
               <MultiSelectDropdown label="Industry ETF"
-                options={["SOXX","IGV","CLOU","FDN","CIBR","BOTZ","ESPO","IBB","XBI","IHI","PJP","XHS","KRE","KBE","KCE","KIE","XRT","XHB","PEJ","XOP","OIH","AMLP","TAN","URA","GDX","GDXJ","SIL","XME","COPX","LIT","ITA","JETS","IYT","PAVE","VNQ","IYZ"].map(s=>s)}
+                options={[SOXX","IGV","CLOU","FDN","CIBR","BOTZ","ESPO","IBB","XBI","IHI","PJP","XHS","KRE","KBE","KCE","KIE","XRT","XHB","PEJ","XOP","OIH","AMLP","TAN","URA","GDX","GDXJ","SIL","XME","COPX","LIT","ITA","JETS","IYT","PAVE","VNQ","IYZ"].map(s=>s)}
                 selected={eodF.industryEtfs} onChange={v=>setE("industryEtfs",v)}
                 color="#00d4ff" width={200}/>
             </div>

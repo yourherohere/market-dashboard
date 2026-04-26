@@ -9,17 +9,27 @@ import { fileURLToPath } from "url";
 
 import { PORT }    from "./config.js";
 
-// Simple in-process rate limiter (no external dep required)
+// In-process rate limiter with automatic stale-entry cleanup
 const rateLimits = new Map();
+
+// Prune expired entries every 10 minutes to prevent memory leak
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of rateLimits) {
+    if (now > entry.reset) rateLimits.delete(key);
+  }
+}, 10 * 60_000).unref();   // .unref() — won't keep process alive
+
 function rateLimit({ windowMs, max, keyFn }) {
   return (req, res, next) => {
-    const key = keyFn ? keyFn(req) : req.ip;
-    const now = Date.now();
+    const key = keyFn ? keyFn(req) : (req.ip || "anon");
+    const now  = Date.now();
     const entry = rateLimits.get(key) || { count: 0, reset: now + windowMs };
     if (now > entry.reset) { entry.count = 0; entry.reset = now + windowMs; }
     entry.count++;
     rateLimits.set(key, entry);
     if (entry.count > max) {
+      res.set("Retry-After", String(Math.ceil((entry.reset - now) / 1000)));
       return res.status(429).json({
         error: "Too many requests",
         retryAfter: Math.ceil((entry.reset - now) / 1000),
@@ -53,11 +63,35 @@ const app = express();
 
 // ── Middleware ────────────────────────────────────────────────────────────────
 app.use(helmet({
-  contentSecurityPolicy: false, // allow Vite HMR
+  contentSecurityPolicy: process.env.NODE_ENV === "production" ? {
+    directives: {
+      defaultSrc:  ["'self'"],
+      scriptSrc:   ["'self'", "'unsafe-inline'", "cdnjs.cloudflare.com", "fonts.googleapis.com"],
+      styleSrc:    ["'self'", "'unsafe-inline'", "fonts.googleapis.com"],
+      fontSrc:     ["'self'", "fonts.gstatic.com"],
+      imgSrc:      ["'self'", "data:", "blob:"],
+      connectSrc:  ["'self'", "ws:", "wss:"],
+      frameSrc:    ["'none'"],
+      objectSrc:   ["'none'"],
+    },
+  } : false,  // disabled in dev to allow Vite HMR websocket
   crossOriginEmbedderPolicy: false,
 }));
 app.use(compression());
-app.use(cors({ origin: "*" }));
+// CORS — restrict to configured origins in production
+const CORS_ORIGINS = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map(s => s.trim())
+  : null;  // null = any origin in development
+
+app.use(cors({
+  origin: CORS_ORIGINS
+    ? (origin, cb) => {
+        if (!origin || CORS_ORIGINS.includes(origin)) cb(null, true);
+        else cb(new Error(`CORS: origin ${origin} not allowed`));
+      }
+    : true,                     // allow all in dev (no CORS_ORIGINS set)
+  credentials: true,
+}));
 app.use(express.json({ limit: "1mb" }));
 
 // Request logger

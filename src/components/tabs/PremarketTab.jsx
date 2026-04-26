@@ -4,7 +4,9 @@ import { Spark, McapBadge, EmaBadge, PctCell, LoadingDots, ScoreDial } from "../
 import { pct, fmt, gc, fmtMcap, fmtVol, calcRet, calcRetSince, soM, soY, sparkPath } from "../../utils/format.js";
 import { GICS, ALL_ETF_SYMS, SECTOR_ETF_SYMS, SUB_ETF_SYMS, secCol, INDEX_SYMS } from "../../constants/gics.js";
 
-const BASE = "http://localhost:3001";
+// API base: empty string = same origin (via Vite proxy in dev, same-origin in prod)
+// Override with VITE_API_BASE_URL env var for remote deployments
+const BASE = (typeof __API_BASE__ !== "undefined" && __API_BASE__) ? __API_BASE__ : "";
 async function apiFetch(path, opts={}) {
   const url = path.startsWith("http") ? path : BASE + path;
   const res = await fetch(url, { headers:{"Content-Type":"application/json"}, ...opts });
@@ -32,6 +34,9 @@ const calcCompositeRS = (s, spy) => {
 };
 
 function SigBadge({ sig }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   const colors = { BREAKOUT:T.accent, "BUY ZONE":T.accent, PULLBACK:"#ff9f1c", BREAKDOWN:T.down };
   const c = colors[sig] || T.textDim;
   if (!sig) return null;
@@ -75,7 +80,7 @@ function TVChartPopup({ symbol, onClose }) {
     if (!containerRef.current) return;
     setLoading(true); setErr(null); setInfo(null);
     try {
-      const res = await fetch("http://localhost:3001/api/candles?symbol=" + encodeURIComponent(symbol) + "&days=365");
+      const res = await fetch(`${BASE}/api/candles?symbol=` + encodeURIComponent(symbol) + "&days=365");
       if (!res.ok) throw new Error("API error " + res.status);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
@@ -377,6 +382,9 @@ function fmtFloat(n) {
 }
 
 function PMCell({ v, suffix="%" , big, colorize=true }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   if (v == null) return <span style={{fontFamily:"monospace",fontSize:9,color:T.textGhost}}>—</span>;
   const c = !colorize ? T.text
     : v > 10 ? T.accent : v > 5 ? T.accent : v > 0 ? T.accent

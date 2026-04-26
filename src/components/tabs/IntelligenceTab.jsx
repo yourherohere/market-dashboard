@@ -12,7 +12,9 @@ import { useTheme, THEME }  from "../../hooks/useTheme.js";
 import { pct, fmt, gc, fmtVol } from "../../utils/format.js";
 import { secCol } from "../../constants/gics.js";
 
-const BASE = "http://localhost:3001";
+// API base: empty string = same origin (via Vite proxy in dev, same-origin in prod)
+// Override with VITE_API_BASE_URL env var for remote deployments
+const BASE = (typeof __API_BASE__ !== "undefined" && __API_BASE__) ? __API_BASE__ : "";
 async function apiFetch(p, o={}) {
   const r = await fetch(p.startsWith("http") ? p : BASE+p,
     { headers:{"Content-Type":"application/json"}, ...o });
@@ -22,7 +24,10 @@ async function apiFetch(p, o={}) {
 }
 
 // ── Mini bar chart ────────────────────────────────────────────────────────────
-function MiniBarChart({ data=[], height=40, colorPos="var(--clr-accent)", colorNeg="var(--clr-dn)" }) {
+function MiniBarChart({
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+ data=[], height=40, colorPos="var(--clr-accent)", colorNeg="var(--clr-dn)" }) {
   if (!data.length) return (
     <div style={{height, background:T.row, borderRadius:3, display:"flex",
       alignItems:"center", justifyContent:"center"}}>
@@ -52,6 +57,9 @@ function MiniBarChart({ data=[], height=40, colorPos="var(--clr-accent)", colorN
 
 // ── Gauge widget ─────────────────────────────────────────────────────────────
 function Gauge({ value, min=-0.1, max=0.1, label="" }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   const norm   = Math.max(0, Math.min(1, (value - min) / (max - min)));
   const color  = value > 0.02 ? T.accent : value < -0.02 ? T.down : "#ffe040";
   const deg    = norm * 180 - 90;   // -90° to +90°
@@ -80,6 +88,9 @@ function Gauge({ value, min=-0.1, max=0.1, label="" }) {
 
 // ── Stage badge ───────────────────────────────────────────────────────────────
 function StageBadge({ stage }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   const map = {
     1: { c:"#ffe040", bg:"rgba(255,224,64,.12)",  l:"S1" },
     2: { c:T.accent, bg:"rgba(0,232,122,.15)",   l:"S2" },
@@ -98,6 +109,9 @@ function StageBadge({ stage }) {
 
 // ── RS Rank badge ─────────────────────────────────────────────────────────────
 function RSBadge({ rank }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   if (rank == null) return <span style={{fontFamily:"monospace",fontSize:8,color:T.textFaint}}>—</span>;
   const c = rank>=90?T.accent:rank>=80?T.accent:rank>=70?"#ffe040":rank>=50?"#ff9f1c":T.down;
   return (
@@ -110,6 +124,9 @@ function RSBadge({ rank }) {
 
 // ── Setup score bar ───────────────────────────────────────────────────────────
 function SetupBar({ score }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   if (score == null) return null;
   const c = score>=80?T.accent:score>=60?T.accent:score>=40?"#ffe040":"#ff9f1c";
   return (
@@ -124,6 +141,9 @@ function SetupBar({ score }) {
 
 // ── Earnings flag ─────────────────────────────────────────────────────────────
 function EarningsBadge({ days }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   if (days == null) return null;
   const c   = days <= 2 ? T.down : days <= 5 ? "#ff9f1c" : "#ffe040";
   const lbl = days === 0 ? "TODAY" : days === 1 ? "TOMORROW" : `${days}D`;
@@ -138,6 +158,9 @@ function EarningsBadge({ days }) {
 
 // ── Position Size Calculator ──────────────────────────────────────────────────
 function RiskCalculator({ prefill={} }) {
+  const _tk = useTheme();
+  const T   = THEME[_tk] || THEME.night;
+
   const [account, setAccount] = useState("100000");
   const [riskPct, setRiskPct] = useState("1");
   const [entry,   setEntry]   = useState(prefill.price ? String(prefill.price.toFixed(2)) : "");

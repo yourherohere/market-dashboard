@@ -3,7 +3,7 @@ import { useTheme, THEME } from "../../hooks/useTheme.js";
 import { Spark, McapBadge, EmaBadge, PctCell, LoadingDots, ScoreDial } from "../common/index.jsx";
 import { pct, fmt, gc, fmtMcap, fmtVol, calcRet, calcRetSince, soM, soY, sparkPath } from "../../utils/format.js";
 import { GICS, ALL_ETF_SYMS, SECTOR_ETF_SYMS, SUB_ETF_SYMS, ALL_SECTORS, SECTOR_INDUSTRY_MAP, secCol, INDEX_SYMS } from "../../constants/gics.js";
-const BASE="http://localhost:3001";
+const BASE="" + ;
 async function apiFetch(p,o={}){const r=await fetch(p.startsWith("http")?p:BASE+p,{headers:{"Content-Type":"application/json"},...o});if(!r.ok){const e=await r.json().catch(()=>({error:r.statusText}));throw new Error(e.error||"HTTP "+r.status);}return r.json();}
 const heat=v=>{if(v>=5)return{bg:"rgba(0,232,122,.25)",fg:"#00e87a"};if(v>=2)return{bg:"rgba(0,232,122,.12)",fg:"#4ddb9e"};if(v>=0)return{bg:"rgba(0,232,122,.05)",fg:"#7ab89a"};if(v>=-2)return{bg:"rgba(255,69,96,.05)",fg:"#d08080"};if(v>=-5)return{bg:"rgba(255,69,96,.12)",fg:"#ff6060"};return{bg:"rgba(255,69,96,.25)",fg:"#ff4560"};};
 

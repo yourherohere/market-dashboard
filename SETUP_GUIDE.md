@@ -1,14 +1,10 @@
 # Setup Guide — Market Dashboard v2.0
 
 ## Prerequisites
+- **Node.js** 18+ (20 LTS recommended) · npm 9+
+- ~500 MB disk for the SQLite database after full bootstrap
 
-- **Node.js** 18+ (20 LTS recommended)
-- **npm** 9+
-- ~500 MB disk space for the database after full bootstrap
-
----
-
-## Installation
+## Quick Start
 
 ```bash
 git clone https://github.com/yourherohere/market-dashboard.git
@@ -19,129 +15,71 @@ npm run db:init
 npm run dev
 ```
 
-Open **http://localhost:5173** — the app loads immediately with live data from Yahoo Finance.
-
----
+Open **http://localhost:5173**
 
 ## Data Pipeline (run once, in order)
 
-### 1 — Bootstrap historical prices
-
-Downloads 2 years of daily OHLCV data for all ~6,500 US stocks from Yahoo Finance.
-Takes **60–90 minutes** with a stable internet connection.
-
 ```bash
-npm run bootstrap:2y
+npm run bootstrap:2y      # ~60–90 min — 2Y OHLCV for 6,500 symbols
+npm run bootstrap:retry   # retry any errors + symbols with no price data
+npm run enrich:sectors    # sector / industry / ETF mappings (~5 min)
+npm run compute:analytics # RS ranks, stages, setup scores (~5 min)
+npm run compute:ema       # EMA touch/cross flags (~3 min)
+npm run compute:earnings  # upcoming earnings dates (~10 min)
 ```
 
-Monitor progress — the terminal shows `ok=N err=N` counts live. When done:
-
-```bash
-npm run bootstrap:status
-# Expected: ok: 6200+, error: <400, pending: 0
-```
-
-If errors remain:
-
-```bash
-npm run bootstrap:retry     # retries all errors + symbols with no data
-```
-
-### 2 — Enrich sector/industry/ETF mappings
-
-Maps each symbol to its GICS sector, industry, and corresponding ETF.
-
-```bash
-npm run enrich:sectors
-# Takes ~5 minutes
-```
-
-### 3 — Compute analytics
-
-Calculates RS ranks (1–99), Weinstein stages (1–4), setup scores (0–100),
-pocket pivots, earnings dates, RS vs sector/industry ETF.
-
-```bash
-npm run compute:analytics
-# Takes ~3–5 minutes
-```
-
-### 4 — Compute EMA touch flags
-
-Calculates `touch_ema10/20/50/100/200` and `cross_ema*` flags from OHLC bars
-for the EMA Touch Scanner in the Intel tab.
-
-```bash
-npm run compute:ema
-# Takes ~3 minutes
-```
-
-### 5 — Fetch earnings dates
-
-Pulls upcoming earnings dates for all symbols.
-
-```bash
-npm run compute:earnings
-# Takes ~10 minutes
-```
-
----
-
-## Nightly Updates
-
-After setup, the server auto-runs nightly at **4:35 PM ET** on weekdays:
-
-1. Downloads today's EOD prices
-2. Recomputes returns for updated symbols
-3. Refreshes RS vs sector ETF
-4. Recomputes analytics (RS ranks, stages, scores)
-5. Recomputes EMA touch flags
-
-No manual action needed.
-
----
-
-## Validate Data Quality
-
-The Intel tab → **✅ VALIDATE** shows a health check dashboard. Or via API:
-
-```bash
-curl http://localhost:3001/api/analytics/validate | python3 -m json.tool
-```
-
----
-
-## Troubleshooting
-
-### "T is not defined" crash
-Replace all tab files from the latest release — this was a theme token scope issue now fixed.
-
-### Bootstrap shows 3000+ errors
-Run `npm run bootstrap:retry` — most are transient Yahoo Finance rate limits.
-
-### EMA Cross returns 0 results
-Run `npm run compute:ema` first. The scanner computes EMA live from `eod_prices`
-but the touch flag columns must be initialized.
-
-### McClellan Oscillator shows "Needs 40+ days"
-The oscillator needs 40+ trading days of A/D history. It self-populates over time
-after each nightly EOD run.
-
-### Port 3001 already in use
-```bash
-kill $(lsof -ti:3001)
-npm run server:start
-```
-
----
+After setup the server auto-runs nightly at **4:35 PM ET** on weekdays.
 
 ## Environment Variables
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3001` | Server port |
-| `NODE_ENV` | `development` | `production` enables static file serving |
-| `LOG_LEVEL` | `info` | `debug` for verbose request logging |
-| `DB_PATH` | `data/market.db` | Override database location |
-| `YF_DISABLE_VERSION_CHECK` | `1` | Suppress Yahoo Finance version warnings |
+| `NODE_ENV` | `development` | `production` enables static serving |
+| `LOG_LEVEL` | `info` | `debug` for verbose output |
+| `DB_PATH` | `data/market.db` | Override database path |
+| `YF_DISABLE_VERSION_CHECK` | `1` | Suppress Yahoo Finance warnings |
+| `VITE_API_BASE_URL` | *(empty)* | Remote API host for production deploys |
+| `ALLOWED_ORIGINS` | localhost only | Comma-separated CORS whitelist |
 
+## Deploying to a Remote Server
+
+```bash
+# 1. Build the frontend
+VITE_API_BASE_URL=https://api.yourdomain.com npm run build
+
+# 2. Serve the Express API on port 3001
+NODE_ENV=production ALLOWED_ORIGINS=https://yourdomain.com npm run server:start
+
+# 3. Serve the dist/ folder from nginx / Caddy pointing to yourdomain.com
+```
+
+## Troubleshooting
+
+**App crashes with "T is not defined"**
+Replace all tab files from the latest commit.
+
+**Bootstrap shows 400+ errors**
+These are Yahoo Finance rate limits. Run `npm run bootstrap:retry` — it retries up to 5 times per symbol. Expected final error rate for a stable connection: <100 symbols (OTC/delisted).
+
+**EMA Cross returns 0 results**
+Run `npm run compute:ema` first. The scanner computes EMA live but the touch flags must be initialized at least once.
+
+**Port 3001 already in use (macOS/Linux)**
+```bash
+kill $(lsof -ti:3001)       # macOS/Linux
+netstat -ano | findstr 3001 # Windows — get PID, then:
+taskkill /PID <pid> /F      # Windows — kill it
+```
+
+**McClellan Oscillator shows "Needs 40+ days"**
+Self-populates after 40 nightly EOD runs. No action needed.
+
+## git rm node_modules (if committed by accident)
+
+```bash
+git rm -r --cached node_modules
+git rm --cached .DS_Store 2>/dev/null || true
+git add .gitignore
+git commit -m "chore: untrack node_modules and .DS_Store"
+```

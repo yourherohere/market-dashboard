@@ -4,7 +4,9 @@ import { Spark, McapBadge, EmaBadge, PctCell, LoadingDots, ScoreDial } from "../
 import { pct, fmt, gc, fmtMcap, fmtVol, calcRet, calcRetSince, soM, soY, sparkPath } from "../../utils/format.js";
 import { GICS, ALL_ETF_SYMS, SECTOR_ETF_SYMS, SUB_ETF_SYMS, secCol, INDEX_SYMS } from "../../constants/gics.js";
 
-const BASE = "http://localhost:3001";
+// API base: empty string = same origin (via Vite proxy in dev, same-origin in prod)
+// Override with VITE_API_BASE_URL env var for remote deployments
+const BASE = (typeof __API_BASE__ !== "undefined" && __API_BASE__) ? __API_BASE__ : "";
 async function apiFetch(path, opts={}) {
   const url = path.startsWith("http") ? path : BASE + path;
   const res = await fetch(url, { headers:{"Content-Type":"application/json"}, ...opts });
@@ -13,12 +15,12 @@ async function apiFetch(path, opts={}) {
 }
 
 const heat = v => {
-  if(v>=5)  return{bg:"rgba(0,232,122,.25)",fg:T.accent};
-  if(v>=2)  return{bg:"rgba(0,232,122,.12)",fg:T.accent};
+  if(v>=5)  return{bg:"rgba(0,232,122,.25)",fg:"var(--clr-up)"};
+  if(v>=2)  return{bg:"rgba(0,232,122,.12)",fg:"var(--clr-up)"};
   if(v>=0)  return{bg:"rgba(0,232,122,.05)",fg:"#7ab89a"};
   if(v>=-2) return{bg:"rgba(255,69,96,.05)",fg:"#d08080"};
   if(v>=-5) return{bg:"rgba(255,69,96,.12)",fg:"#ff6060"};
-  return      {bg:"rgba(255,69,96,.25)",fg:T.down};
+  return      {bg:"rgba(255,69,96,.25)",fg:"var(--clr-dn)"};
 };
 
 const calcRS = (secRet, spyRet) => {
@@ -77,7 +79,7 @@ function TVChartPopup({ symbol, onClose }) {
     if (!containerRef.current) return;
     setLoading(true); setErr(null); setInfo(null);
     try {
-      const res = await fetch("http://localhost:3001/api/candles?symbol=" + encodeURIComponent(symbol) + "&days=365");
+      const res = await fetch(`${BASE}/api/candles?symbol=` + encodeURIComponent(symbol) + "&days=365");
       if (!res.ok) throw new Error("API error " + res.status);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
