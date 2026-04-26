@@ -4,7 +4,15 @@ import { cache }   from "../cache.js";
 import { CACHE }   from "../config.js";
 import { db }      from "../db/index.js";
 import { log }     from "../logger.js";
-import { validateQuery, SCAN_SCHEMA } from "../middleware/validate.js";
+// ── Input validation helpers (inline — no external middleware dep) ────────────
+const VALID_SYMBOL    = /^[A-Z0-9.\-^]{1,10}$/i;
+const VALID_SORT_CHARS = /^[a-z0-9_]{1,30}$/;
+const clampInt = (v,mn,mx,def) => { const n=parseInt(v,10);  return isNaN(n)?def:Math.max(mn,Math.min(mx,n)); };
+const clampFlt = (v,mn,mx,def) => { const n=parseFloat(v);  return isNaN(n)?def:Math.max(mn,Math.min(mx,n)); };
+function validateEmaList(emas) {
+  const VALID = new Set(["10","20","50","100","200"]);
+  return String(emas||"50").split(",").map(e=>e.trim()).filter(e=>VALID.has(e));
+}
 import {
   computeAnalytics, computeBreadthMetrics,
   computeSectorBreadth, computeIndustryBreadth,
