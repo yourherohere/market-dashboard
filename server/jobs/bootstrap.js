@@ -26,13 +26,16 @@ import { BATCH }             from "../config.js";
 
 // ── Configuration ─────────────────────────────────────────────────────────────
 const ARGS         = process.argv.slice(2);
-const YEARS        = parseFloat(ARGS.find((_, i) => ARGS[i-1] === "--years") || "2");
+const YEARS        = parseFloat(ARGS.find((_, i) => ARGS[i-1] === "--years") || "0");
+const DAYS_ARG     = parseInt(ARGS.find((_, i) => ARGS[i-1] === "--days") || "0");
 const RETRY_ONLY   = ARGS.includes("--retry");
 const RESET        = ARGS.includes("--reset");
-const BATCH_SIZE   = 12;   // concurrent Yahoo chart fetches per wave
-const WAVE_DELAY   = 200;  // ms between waves — be kind to Yahoo
-const WRITE_BATCH  = 500;  // rows per SQLite INSERT transaction
-const DAYS         = Math.round(YEARS * 365) + 30; // extra buffer for weekends/holidays
+const BATCH_SIZE   = 12;
+const WAVE_DELAY   = 200;
+const WRITE_BATCH  = 500;
+const DAYS         = DAYS_ARG > 0
+  ? DAYS_ARG + 5   // add a 5-day buffer for weekends/holidays
+  : Math.round(YEARS * 365) + 30;
 
 // ── Global progress state (exported for API endpoint) ─────────────────────────
 export const bootstrapState = {
